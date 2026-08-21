@@ -36,7 +36,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.application.conversation import detect_language  # noqa: E402
 from src.domain.policies import contains_contact_data  # noqa: E402
 
-JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-4.1-mini")
+#: El juez usa un nivel **superior** al del agente evaluado. Si juzgara el mismo
+#: modelo que responde, compartiría sus puntos ciegos: lo que a Luna le parece una
+#: respuesta bien fundamentada también se lo parecería al juzgarla. Un evaluador
+#: más capaz que el evaluado es lo que hace útil el veredicto.
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-5.6-terra")
 
 #: Reintentos ante 429 antes de dar el caso por fallido.
 _MAX_429_RETRIES = 3

@@ -25,7 +25,15 @@ class Settings(BaseSettings):
     #: El modelo lo decide el servidor, no quien llama. La plataforma que registra
     #: el agente ofrece un campo "Modelo" opcional; aceptarlo dejaría que un
     #: tercero forzara un modelo caro o inexistente contra nuestra cuenta.
-    openai_model: str = Field(default="gpt-4.1-mini")
+    #:
+    #: Se parte del nivel más económico de la familia. La tarea es Q&A fundamentado
+    #: sobre un contexto que ya se le entrega, no razonamiento intensivo, así que
+    #: la pregunta no es "¿cuál es el mejor modelo?" sino "¿cuál es el más barato
+    #: que supera la suite de evaluación?". Los casos de `pii`, `injection` y
+    #: `honestidad` son los que discriminan: si el nivel elegido falla alguno, se
+    #: sube al siguiente. Verificar el identificador con:
+    #:     python scripts/check_model.py --list --prefix gpt-5
+    openai_model: str = Field(default="gpt-5.6-luna")
 
     request_timeout_seconds: float = Field(default=60.0)
 
