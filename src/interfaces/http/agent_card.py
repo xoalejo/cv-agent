@@ -4,11 +4,11 @@ Sirve para que un cliente descubra qué es este agente y cómo hablarle sin que
 alguien tenga que teclear los datos a mano. La plataforma del reto la usa para
 autocompletar su formulario de registro.
 
-Se declara **solo lo que el servicio realmente hace**. En concreto,
-`streaming: false`: el endpoint responde de forma síncrona y rechaza
-`stream: true` de forma explícita. Anunciar una capacidad que no existe sería
-peor que no anunciarla, porque un cliente que la creyera disponible fallaría al
-usarla.
+Se declara **solo lo que el servicio realmente hace**. `streaming: true` figura
+aquí porque el endpoint implementa la secuencia de eventos SSE del protocolo, con
+`sequence_number` correlativo y terminador `[DONE]`, no porque quede mejor:
+anunciar una capacidad inexistente rompería a cualquier cliente que la creyera
+disponible.
 
 La tarjeta es pública por definición (es un mecanismo de descubrimiento) y no
 contiene credenciales: solo declara que el endpoint espera un token Bearer, no
@@ -41,7 +41,7 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
     base = base_url.rstrip("/")
 
     return {
-        "protocolVersion": "0.2.9",
+        "protocolVersion": "0.3.0",
         "name": f"Agente de CV de {profile.full_name}",
         "description": (
             f"Conversa sobre la trayectoria profesional de {profile.full_name}: "
@@ -50,7 +50,14 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
             "mantiene la continuidad del hilo."
         ),
         "url": base,
-        "preferredTransport": "JSONRPC",
+        # El transporte real es HTTP con cuerpos JSON, no JSON-RPC.
+        "preferredTransport": "HTTP+JSON",
+        # `supportedInterfaces` es la forma que introdujo A2A v0.3 y sustituye al
+        # par `url`/`preferredTransport`. Se declaran ambas: los consumidores
+        # antiguos leen la primera y los nuevos exigen esta.
+        "supportedInterfaces": [
+            {"transport": "HTTP+JSON", "url": base},
+        ],
         "version": "1.0.0",
         "documentationUrl": "https://github.com/xoalejo/cv-agent",
         "provider": {
@@ -58,8 +65,9 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
             "url": "https://github.com/xoalejo",
         },
         "capabilities": {
-            # Declarado como es: el endpoint es síncrono y rechaza stream=true.
-            "streaming": False,
+            # El endpoint emite la secuencia de eventos SSE del protocolo cuando
+            # la petición llega con stream=true.
+            "streaming": True,
             "pushNotifications": False,
             "stateTransitionHistory": False,
         },

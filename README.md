@@ -33,7 +33,8 @@ su razón y, cuando aplica, con la alternativa que se descartó.
 
 Responde preguntas sobre experiencia, habilidades, proyectos, patentes y
 formación, en **español o inglés** según el idioma de quien pregunta, manteniendo
-la continuidad del hilo de conversación.
+la continuidad del hilo de conversación. Admite respuesta síncrona y **streaming
+SSE** (`"stream": true`).
 
 ```bash
 curl -X POST https://cv-agent-amber.vercel.app/responses \
@@ -92,7 +93,7 @@ Pruebas y evaluación:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                              # 127 pruebas, sin red
+pytest                                              # 140 pruebas, sin red
 python evals/run_evals.py --base-url http://localhost:8000
 ```
 
@@ -166,7 +167,7 @@ No por dogma. Se justifica por dos cosas medibles:
    OpenAI sustituible. Es la misma tesis que sostiene a Open Responses, desacoplar
    el agente del proveedor, aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
-   sin llamar a ningún servicio: **127 pruebas en ~1.4 s, sin gastar un token**.
+   sin llamar a ningún servicio: **140 pruebas en ~1.6 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
 ### 3. Por qué no se usó RAG con base vectorial
@@ -289,7 +290,34 @@ de argumento de venta. El prompt prohíbe explícitamente prometer plazos, resul
 o desempeño, y los casos de la categoría `honestidad` verifican que la frontera se
 respete.
 
-### 7. `reasoning.effort` en lugar de `temperature`
+### 7. Streaming: el guarda de PII tuvo que rediseñarse
+
+El endpoint implementa la secuencia SSE del protocolo: `response.created`,
+`in_progress`, alta del ítem y de la parte de contenido, los deltas de texto, el
+cierre de cada nivel, `response.completed` y el terminador literal `[DONE]`, con
+`sequence_number` correlativo.
+
+Lo que no es evidente es que **el streaming abre un agujero en la política de
+divulgación**. El guarda que teníamos revisa la respuesta completa y redacta lo
+que parezca un teléfono; al emitir fragmentos conforme se generan, ese texto
+completo nunca existe, y lo ya emitido no se puede retirar. Un número repartido
+en varios trozos saldría sin que ningún fragmento coincidiera con el patrón.
+
+La solución es `StreamingDisclosureGuard`, que **retiene la cola**: mientras el
+final del texto acumulado pueda ser el principio de algo con forma de teléfono,
+esa parte no sale. Se libera cuando llega texto que demuestra que no lo era, o al
+cerrar el flujo. El resto se emite en cuanto está disponible, así que no se
+pierde la ventaja del streaming.
+
+Las pruebas fijan la propiedad que importa: un número troceado en cinco
+fragmentos no produce ningún fragmento con dígitos del número, mientras métricas
+(`17,000+`), expedientes (`MX/a/2024/008296`) y normas (`IATF 16949`) pasan
+intactos.
+
+El ciclo de herramientas funciona igual en ambos modos: las llamadas se resuelven
+dentro del servicio y solo el texto de la respuesta final llega al cliente.
+
+### 8. `reasoning.effort` en lugar de `temperature`
 
 **Esta familia de modelos no admite `temperature`**: la API rechaza cualquier valor
 distinto del predeterminado. Es un detalle que conviene conocer, porque el
@@ -302,20 +330,20 @@ El control equivalente es `reasoning.effort`, configurable por entorno y fijado 
 resolver un problema: subir el esfuerzo añade latencia y costo sin mejorar
 respuestas que no requieren deliberación.
 
-### 8. El servidor decide el modelo
+### 9. El servidor decide el modelo
 
 La plataforma ofrece un campo "Modelo" opcional que viaja como `model` en el
 cuerpo de la petición. **Se ignora deliberadamente.** Aceptarlo dejaría que un
 tercero forzara un modelo caro o inexistente contra la cuenta que paga las
 llamadas. El modelo se configura por variable de entorno en el servidor.
 
-### 9. El agente habla *de* Oscar, no *como* Oscar
+### 10. El agente habla *de* Oscar, no *como* Oscar
 
 Responde en tercera persona. Un endpoint público que simula ser una persona real
 plantea un problema de transparencia que un asistente representando un perfil no
 tiene, y deja claro a quien pregunta que conversa con un sistema.
 
-### 10. Un solo idioma canónico, traducción en el momento
+### 11. Un solo idioma canónico, traducción en el momento
 
 El perfil se almacena **solo en español**, el idioma original del CV. Cuando la
 pregunta llega en inglés, el agente traduce al responder en lugar de leer de una
@@ -420,7 +448,7 @@ pruebas*.
 ### Pruebas unitarias e integración (sin red)
 
 ```bash
-pytest -q     # 127 pruebas en ~1.4 s
+pytest -q     # 140 pruebas en ~1.6 s
 ```
 
 Cubren las políticas de divulgación (incluidos los falsos positivos), la búsqueda
@@ -516,7 +544,7 @@ En **Agentes → Añadir un agente**:
 |---|---|
 | **URL base** | `https://cv-agent-amber.vercel.app` |
 | **Clave de API** | el valor de `AGENT_API_KEY` |
-| **Modelo** | *vacío*, lo decide el servidor ([decisión 6](#6-el-servidor-decide-el-modelo)) |
+| **Modelo** | *vacío*, lo decide el servidor ([decisión 9](#9-el-servidor-decide-el-modelo)) |
 | **Estado de la conversación** | Reproducir transcripción |
 | **Instrucciones** | *vacío*, el prompt propio es autoritativo |
 | **Entrada de imágenes / archivos** | desactivadas (fuera de alcance) |
@@ -537,9 +565,6 @@ capacidad inexistente rompería a cualquier cliente que la creyera disponible.
 
 Se declaran en lugar de presentarse como resueltas.
 
-- **Sin streaming.** El endpoint responde de forma síncrona y **rechaza
-  explícitamente** `stream: true` con un 400 en lugar de ignorarlo. Declarar una
-  compatibilidad parcial como total sería peor que no tenerla.
 - **Límite de tasa por instancia.** El estado vive en el proceso: con varias
   máquinas el límite es por máquina, no global. Suficiente para este alcance;
   hacerlo global requeriría Redis, una dependencia más que operar.
@@ -583,7 +608,7 @@ src/
 │   └── security.py         # Auth y límite de tasa
 └── config.py
 
-tests/          # 127 pruebas, sin red
+tests/          # 140 pruebas, sin red
 evals/          # 26 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```

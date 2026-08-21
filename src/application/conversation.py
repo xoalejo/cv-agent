@@ -14,14 +14,22 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.application.ports import EngineResponse, LLMEngine, ProfileRepository
+from src.application.ports import (
+    EngineResponse,
+    LLMEngine,
+    ProfileRepository,
+    TextDelta,
+    TurnFinished,
+)
 from src.application.prompt import build_instructions
 from src.application.tool_registry import ToolRegistry
 from src.domain.policies import redact_contact_data
 from src.domain.profile import Language
+from src.domain.streaming_guard import StreamingDisclosureGuard
 
 #: Tope de vueltas al modelo dentro de un mismo turno. Sin él, un modelo que
 #: insista en llamar herramientas podría encadenar peticiones indefinidamente:
@@ -58,6 +66,24 @@ _EN_MARKERS = re.compile(
     r"when|who|experience|work|projects|skills|years|company|tell)\b",
     re.IGNORECASE,
 )
+
+
+@dataclass(frozen=True)
+class AnswerDelta:
+    """Fragmento de respuesta ya filtrado por la política de divulgación."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class AnswerCompleted:
+    """Fin de la conversación, con el resultado completo del turno."""
+
+    result: ConversationResult
+
+
+#: Lo que el caso de uso emite al responder en streaming.
+ConversationEvent = AnswerDelta | AnswerCompleted
 
 
 @dataclass(frozen=True)
@@ -186,6 +212,88 @@ class AnswerProfileQuestion:
             tools_invoked=tuple(tools_invoked),
             iterations=self._max_iterations,
             exhausted=True,
+        )
+
+    def execute_stream(
+        self,
+        input_items: list[dict[str, Any]],
+        *,
+        caller_instructions: str | None = None,
+    ) -> Iterator[ConversationEvent]:
+        """Igual que `execute`, emitiendo la respuesta conforme se genera.
+
+        El ciclo de herramientas es el mismo: lo que cambia es que el texto del
+        turno final sale por partes en lugar de esperar a estar completo.
+
+        Cada fragmento pasa por `StreamingDisclosureGuard` antes de salir. Sin
+        ese filtro el streaming sería un agujero en la política de divulgación:
+        el guarda de la respuesta completa revisa un texto que aquí nunca existe
+        de una pieza, y lo ya emitido no se puede retirar.
+        """
+        instructions = build_instructions(
+            self._profiles.get(), caller_instructions=caller_instructions
+        )
+        language = detect_language(extract_last_user_text(input_items))
+
+        items: list[dict[str, Any]] = list(input_items)
+        tools_invoked: list[str] = []
+        guard = StreamingDisclosureGuard(language)
+        last: EngineResponse | None = None
+
+        for iteration in range(1, self._max_iterations + 1):
+            last = None
+            for event in self._engine.respond_stream(
+                instructions=instructions,
+                input_items=items,
+                tools=self._tools.definitions,
+            ):
+                if isinstance(event, TextDelta):
+                    if seguro := guard.feed(event.text):
+                        yield AnswerDelta(seguro)
+                elif isinstance(event, TurnFinished):
+                    last = event.response
+
+            if last is None:
+                break
+
+            if not last.requires_tools:
+                if resto := guard.flush():
+                    yield AnswerDelta(resto)
+                yield AnswerCompleted(
+                    self._finish(
+                        last,
+                        language=language,
+                        tools_invoked=tools_invoked,
+                        iterations=iteration,
+                    )
+                )
+                return
+
+            items.extend(last.output_items)
+            for call in last.tool_calls:
+                tools_invoked.append(call.name)
+                result = self._tools.execute(call.name, call.arguments)
+                items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": call.call_id,
+                        "output": json.dumps(result, ensure_ascii=False),
+                    }
+                )
+
+        # Se agotaron las vueltas sin respuesta final.
+        if resto := guard.flush():
+            yield AnswerDelta(resto)
+        yield AnswerCompleted(
+            ConversationResult(
+                response_id=last.response_id if last else "",
+                output_text=_EXHAUSTED_MESSAGE[language],
+                model=last.model if last else "",
+                usage=last.usage if last else {},
+                tools_invoked=tuple(tools_invoked),
+                iterations=self._max_iterations,
+                exhausted=True,
+            )
         )
 
     def _finish(

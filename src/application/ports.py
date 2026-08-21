@@ -10,6 +10,7 @@ con los puertos en dobles de prueba, el caso de uso se prueba sin red.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -50,6 +51,24 @@ class EngineResponse:
         return bool(self.tool_calls)
 
 
+@dataclass(frozen=True)
+class TextDelta:
+    """Fragmento de texto emitido por el modelo mientras genera."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class TurnFinished:
+    """Fin de un turno del modelo, con el resultado completo."""
+
+    response: EngineResponse
+
+
+#: Lo que un motor emite al generar en streaming.
+EngineStreamEvent = TextDelta | TurnFinished
+
+
 class LLMEngine(Protocol):
     """Motor de lenguaje capaz de razonar con herramientas."""
 
@@ -64,6 +83,21 @@ class LLMEngine(Protocol):
 
         No debe persistir la conversación del lado del proveedor: la continuidad
         del hilo la aporta `input_items` en cada llamada.
+        """
+        ...
+
+    def respond_stream(
+        self,
+        *,
+        instructions: str,
+        input_items: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> Iterator[EngineStreamEvent]:
+        """Ejecuta un turno emitiendo el texto conforme se genera.
+
+        Emite cero o más `TextDelta` y termina siempre con un `TurnFinished`,
+        que trae el turno completo para que quien orquesta pueda decidir si hay
+        herramientas que ejecutar.
         """
         ...
 

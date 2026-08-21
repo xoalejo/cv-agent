@@ -106,3 +106,59 @@ class TestProfileDataHygiene:
 
         offenders = [blob for blob in blobs if contains_contact_data(blob)]
         assert offenders == []
+
+
+class TestStreamingDisclosureGuard:
+    """El guarda que hace segura la emisión por fragmentos.
+
+    Lo que se emite no se puede retirar, así que la propiedad a garantizar es que
+    ningún dígito con forma de teléfono salga, ni siquiera troceado entre varios
+    fragmentos.
+    """
+
+    @staticmethod
+    def _emitir(trozos: list[str], idioma: str = "es") -> list[str]:
+        from src.domain.streaming_guard import StreamingDisclosureGuard
+
+        guard = StreamingDisclosureGuard(idioma)  # type: ignore[arg-type]
+        salida = [guard.feed(t) for t in trozos]
+        salida.append(guard.flush())
+        return salida
+
+    def test_ningun_fragmento_contiene_digitos_del_telefono(self) -> None:
+        partes = self._emitir(["Su número es ", "+52 5", "55 12", "3 45", "67."])
+
+        for parte in partes:
+            assert "4567" not in parte
+            assert "5551" not in parte
+
+    def test_el_texto_final_queda_redactado(self) -> None:
+        completo = "".join(self._emitir(["Llámalo al ", "+52 555 123 4567", " hoy."]))
+
+        assert "4567" not in completo
+        assert "no divulgado" in completo
+        assert completo.endswith(" hoy.")
+
+    def test_no_retiene_texto_inofensivo(self) -> None:
+        completo = "".join(self._emitir(["Tiene 15 años ", "de experiencia."]))
+
+        assert completo == "Tiene 15 años de experiencia."
+
+    def test_deja_pasar_metricas_y_expedientes(self) -> None:
+        casos = [
+            (["Procesó 17,000", "+ archivos"], "Procesó 17,000+ archivos"),
+            (["Expediente MX/a/", "2024/008296"], "Expediente MX/a/2024/008296"),
+            (["Norma IATF ", "16949"], "Norma IATF 16949"),
+        ]
+        for trozos, esperado in casos:
+            assert "".join(self._emitir(trozos)) == esperado
+
+    def test_el_email_no_se_ve_afectado(self) -> None:
+        completo = "".join(self._emitir(["Escríbele a osc.09", "@hotmail.com"]))
+
+        assert completo == "Escríbele a osc.09@hotmail.com"
+
+    def test_respeta_el_idioma_del_marcador(self) -> None:
+        completo = "".join(self._emitir(["Call ", "+52 555 123 4567"], "en"))
+
+        assert "contact detail not disclosed" in completo

@@ -21,6 +21,7 @@ con `Retry-After` en lugar de presentar un límite pasajero como avería.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 from openai import (
@@ -32,7 +33,13 @@ from openai import (
     RateLimitError,
 )
 
-from src.application.ports import EngineResponse, ToolCall
+from src.application.ports import (
+    EngineResponse,
+    EngineStreamEvent,
+    TextDelta,
+    ToolCall,
+    TurnFinished,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +165,60 @@ class OpenAIResponsesEngine:
             logger.exception("Fallo al invocar la Responses API")
             raise LLMEngineError(str(exc)) from exc
 
+        return self._to_engine_response(response)
+
+    def respond_stream(
+        self,
+        *,
+        instructions: str,
+        input_items: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> Iterator[EngineStreamEvent]:
+        """Igual que `respond`, emitiendo el texto conforme el modelo lo genera."""
+        try:
+            stream = self._client.responses.create(
+                model=self._model,
+                instructions=instructions,
+                input=input_items,
+                tools=tools,
+                store=False,
+                reasoning={"effort": self._reasoning_effort},
+                stream=True,
+            )
+        except RateLimitError as exc:
+            retry_after = _retry_after_seconds(exc)
+            raise LLMRateLimitError(str(exc), retry_after=retry_after) from exc
+        except (AuthenticationError, NotFoundError) as exc:
+            raise LLMConfigurationError(str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Fallo al abrir el stream de la Responses API")
+            raise LLMEngineError(str(exc)) from exc
+
+        final = None
+        try:
+            for event in stream:
+                tipo = getattr(event, "type", "")
+                if tipo == "response.output_text.delta":
+                    if delta := getattr(event, "delta", ""):
+                        yield TextDelta(delta)
+                elif tipo in ("response.completed", "response.incomplete"):
+                    final = getattr(event, "response", None)
+                elif tipo == "response.failed":
+                    detalle = getattr(event, "response", None)
+                    raise LLMEngineError(f"El proveedor reportó un fallo: {detalle}")
+        except LLMEngineError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Fallo mientras se consumía el stream")
+            raise LLMEngineError(str(exc)) from exc
+
+        if final is None:
+            raise LLMEngineError("El stream terminó sin un evento de finalización.")
+
+        yield TurnFinished(self._to_engine_response(final))
+
+    def _to_engine_response(self, response: Any) -> EngineResponse:
+        """Traduce la respuesta del SDK al vocabulario del puerto."""
         output_items = [_as_dict(item) for item in (response.output or [])]
 
         tool_calls = [
@@ -171,7 +232,7 @@ class OpenAIResponsesEngine:
         ]
 
         usage: dict[str, int] = {}
-        if response.usage is not None:
+        if getattr(response, "usage", None) is not None:
             usage = {
                 "input_tokens": getattr(response.usage, "input_tokens", 0) or 0,
                 "output_tokens": getattr(response.usage, "output_tokens", 0) or 0,
@@ -180,7 +241,7 @@ class OpenAIResponsesEngine:
 
         return EngineResponse(
             response_id=response.id,
-            output_text=(response.output_text or "").strip(),
+            output_text=(getattr(response, "output_text", "") or "").strip(),
             output_items=output_items,
             tool_calls=tool_calls,
             usage=usage,

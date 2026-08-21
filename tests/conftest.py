@@ -13,7 +13,12 @@ from typing import Any
 
 import pytest
 
-from src.application.ports import EngineResponse, ToolCall
+from src.application.ports import (
+    EngineResponse,
+    TextDelta,
+    ToolCall,
+    TurnFinished,
+)
 from src.application.tool_registry import ToolRegistry
 from src.domain.profile import Profile
 from src.infrastructure.lexical_search import LexicalProfileSearch
@@ -48,6 +53,26 @@ class FakeEngine:
         if not self._responses:
             raise AssertionError("FakeEngine se quedó sin respuestas programadas.")
         return self._responses.pop(0)
+
+    def respond_stream(
+        self,
+        *,
+        instructions: str,
+        input_items: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ):
+        """Emite el texto programado en trozos, como haría un modelo real."""
+        respuesta = self.respond(
+            instructions=instructions, input_items=input_items, tools=tools
+        )
+        for trozo in self._trocear(respuesta.output_text):
+            yield TextDelta(trozo)
+        yield TurnFinished(respuesta)
+
+    @staticmethod
+    def _trocear(texto: str, tamano: int = 7) -> list[str]:
+        """Parte el texto en fragmentos pequeños para ejercitar el guarda."""
+        return [texto[i : i + tamano] for i in range(0, len(texto), tamano)] or []
 
 
 def text_response(text: str, *, response_id: str = "resp_test") -> EngineResponse:

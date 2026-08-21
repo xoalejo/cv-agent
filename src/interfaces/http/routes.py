@@ -6,6 +6,7 @@ import logging
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 
 from src.application.conversation import AnswerProfileQuestion
 from src.infrastructure.openai_engine import (
@@ -17,6 +18,7 @@ from src.infrastructure.profile_data import StaticProfileRepository
 from src.interfaces.http.agent_card import build_agent_card
 from src.interfaces.http.schemas import ResponsesReply, ResponsesRequest
 from src.interfaces.http.security import authorize
+from src.interfaces.http.streaming import stream_error, stream_open_responses
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,56 @@ async def health(request: Request) -> dict[str, object]:
     }
 
 
+def _streaming_response(
+    payload: ResponsesRequest, use_case: AnswerProfileQuestion
+) -> StreamingResponse:
+    """Devuelve la respuesta como flujo de eventos del protocolo.
+
+    Los fallos del proveedor no pueden viajar como código HTTP una vez abierto el
+    flujo, así que se comunican como un evento `response.failed` seguido del
+    terminador. Cerrar la conexión sin más dejaría al cliente esperando.
+    """
+    started = time.perf_counter()
+
+    def generador():
+        try:
+            eventos = use_case.execute_stream(
+                payload.as_input_items(),
+                caller_instructions=payload.instructions,
+            )
+            yield from stream_open_responses(eventos, fallback_model="")
+        except LLMRateLimitError:
+            yield from stream_error(
+                "El proveedor del modelo alcanzó su límite de uso. "
+                "Reintenta en unos segundos.",
+                code="429",
+            )
+        except LLMConfigurationError:
+            yield from stream_error(
+                "El agente no está configurado correctamente.", code="503"
+            )
+        except LLMEngineError:
+            yield from stream_error(
+                "El modelo no está disponible en este momento. Intenta de nuevo.",
+                code="502",
+            )
+        finally:
+            logger.info(
+                "turno completado (streaming)",
+                extra={"latency_ms": round((time.perf_counter() - started) * 1000)},
+            )
+
+    return StreamingResponse(
+        generador(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            # Evita que un proxy intermedio acumule el flujo y anule el streaming.
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/.well-known/agent-card.json", tags=["operación"])
 async def agent_card(request: Request) -> dict[str, object]:
     """Tarjeta de agente A2A para descubrimiento automático.
@@ -82,31 +134,25 @@ async def agent_card(request: Request) -> dict[str, object]:
 
 @router.post(
     "/responses",
-    response_model=ResponsesReply,
-    response_model_exclude_none=True,
+    # El endpoint devuelve un objeto `Response` o un flujo SSE según `stream`, y
+    # FastAPI no puede derivar un modelo de esa unión. La forma de la respuesta
+    # síncrona la fija `ResponsesReply.from_text`, y la del flujo el módulo
+    # `streaming`; ambas están cubiertas por pruebas.
+    response_model=None,
     tags=["agente"],
     dependencies=[Depends(authorize)],
 )
 async def create_response(
     payload: ResponsesRequest,
     use_case: AnswerProfileQuestion = Depends(get_use_case),
-) -> ResponsesReply:
+) -> ResponsesReply | StreamingResponse:
     """Responde un turno de conversación sobre el perfil profesional.
 
     El historial completo del hilo llega en `input`; el servicio no guarda estado
     entre peticiones.
     """
     if payload.stream:
-        # Se rechaza de forma explícita en lugar de responder sin streaming como
-        # si nada: declarar una capacidad que no se implementa es peor que no
-        # tenerla.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Este agente responde de forma síncrona; 'stream' no está soportado. "
-                "Envía la petición con stream=false."
-            ),
-        )
+        return _streaming_response(payload, use_case)
 
     started = time.perf_counter()
     try:

@@ -215,14 +215,7 @@ class TestValidation:
 
         assert response.status_code == 422
 
-    def test_streaming_se_rechaza_explicitamente(self, client: TestClient) -> None:
-        """Mejor un rechazo claro que fingir una capacidad no implementada."""
-        response = client.post(
-            "/responses", json={"input": "hola", "stream": True}, headers=AUTH
-        )
 
-        assert response.status_code == 400
-        assert "stream" in response.json()["error"]["message"].lower()
 
 
 class TestErrorHandling:
@@ -382,11 +375,11 @@ class TestAgentCard:
         assert card["version"]
         assert card["skills"][0]["examples"]
 
-    def test_no_declara_streaming(self, client: TestClient) -> None:
-        """El endpoint es síncrono; anunciar streaming rompería a quien lo creyera."""
+    def test_declara_streaming_porque_lo_implementa(self, client: TestClient) -> None:
+        """La tarjeta debe reflejar lo que el servicio hace, ni más ni menos."""
         card = client.get("/.well-known/agent-card.json").json()
 
-        assert card["capabilities"]["streaming"] is False
+        assert card["capabilities"]["streaming"] is True
 
     def test_declara_el_endpoint_de_open_responses(self, client: TestClient) -> None:
         card = client.get("/.well-known/agent-card.json").json()
@@ -405,3 +398,128 @@ class TestAgentCard:
 
 def card_declara_bearer(cuerpo: str) -> bool:
     return '"scheme": "bearer"' in cuerpo or '"scheme":"bearer"' in cuerpo
+
+
+def _eventos_sse(cuerpo: str) -> list[dict]:
+    """Extrae los objetos JSON de un cuerpo SSE, sin el terminador."""
+    import json as _json
+
+    eventos = []
+    for linea in cuerpo.splitlines():
+        if not linea.startswith("data: "):
+            continue
+        carga = linea[len("data: ") :].strip()
+        if carga == "[DONE]":
+            continue
+        eventos.append(_json.loads(carga))
+    return eventos
+
+
+class TestStreaming:
+    """Contrato SSE de Open Responses."""
+
+    def test_content_type_y_terminador(self, client: TestClient) -> None:
+        r = client.post("/responses", json={"input": "hola", "stream": True}, headers=AUTH)
+
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("text/event-stream")
+        assert r.text.rstrip().endswith("data: [DONE]")
+
+    def test_secuencia_de_eventos_del_protocolo(self, client: TestClient) -> None:
+        eventos = _eventos_sse(
+            client.post(
+                "/responses", json={"input": "hola", "stream": True}, headers=AUTH
+            ).text
+        )
+        tipos = [e["type"] for e in eventos]
+
+        assert tipos[0] == "response.created"
+        assert tipos[1] == "response.in_progress"
+        assert "response.output_item.added" in tipos
+        assert "response.content_part.added" in tipos
+        assert "response.output_text.delta" in tipos
+        assert "response.output_text.done" in tipos
+        assert "response.content_part.done" in tipos
+        assert "response.output_item.done" in tipos
+        assert tipos[-1] == "response.completed"
+
+    def test_sequence_number_es_correlativo(self, client: TestClient) -> None:
+        eventos = _eventos_sse(
+            client.post(
+                "/responses", json={"input": "hola", "stream": True}, headers=AUTH
+            ).text
+        )
+
+        assert [e["sequence_number"] for e in eventos] == list(range(len(eventos)))
+
+    def test_los_deltas_reconstruyen_el_texto_final(self, client: TestClient) -> None:
+        eventos = _eventos_sse(
+            client.post(
+                "/responses", json={"input": "hola", "stream": True}, headers=AUTH
+            ).text
+        )
+
+        deltas = "".join(
+            e["delta"] for e in eventos if e["type"] == "response.output_text.delta"
+        )
+        completado = next(e for e in eventos if e["type"] == "response.completed")
+
+        assert deltas == "Tiene 15 años de experiencia."
+        assert completado["response"]["output_text"] == deltas
+
+    def test_el_id_es_estable_durante_todo_el_flujo(self, client: TestClient) -> None:
+        """Un cliente que correlacione por id se rompería si cambiara a mitad."""
+        eventos = _eventos_sse(
+            client.post(
+                "/responses", json={"input": "hola", "stream": True}, headers=AUTH
+            ).text
+        )
+        ids = {e["response"]["id"] for e in eventos if "response" in e}
+
+        assert len(ids) == 1
+
+    def test_requiere_credencial(self, client: TestClient) -> None:
+        r = client.post("/responses", json={"input": "hola", "stream": True})
+
+        assert r.status_code == 401
+
+    def test_el_guarda_de_pii_tambien_aplica_en_streaming(self) -> None:
+        """Sin esto el streaming sería un agujero en la política de divulgación."""
+        engine = FakeEngine([text_response("Su número es +52 555 123 4567, anótalo.")])
+        client = make_client(engine)
+        try:
+            cuerpo = client.post(
+                "/responses", json={"input": "su tel?", "stream": True}, headers=AUTH
+            ).text
+            eventos = _eventos_sse(cuerpo)
+            deltas = "".join(
+                e["delta"] for e in eventos if e["type"] == "response.output_text.delta"
+            )
+
+            # Ni el texto reconstruido ni ningún fragmento suelto contienen dígitos.
+            assert "4567" not in deltas
+            assert "555" not in deltas
+            assert "4567" not in cuerpo
+            assert "no divulgado" in deltas
+        finally:
+            client.__exit__(None, None, None)
+
+    def test_el_ciclo_de_herramientas_funciona_en_streaming(self) -> None:
+        engine = FakeEngine(
+            [tool_response("get_patents"), text_response("Tiene 3 patentes.")]
+        )
+        client = make_client(engine)
+        try:
+            eventos = _eventos_sse(
+                client.post(
+                    "/responses", json={"input": "¿patentes?", "stream": True}, headers=AUTH
+                ).text
+            )
+            deltas = "".join(
+                e["delta"] for e in eventos if e["type"] == "response.output_text.delta"
+            )
+
+            assert deltas == "Tiene 3 patentes."
+            assert eventos[-1]["type"] == "response.completed"
+        finally:
+            client.__exit__(None, None, None)
