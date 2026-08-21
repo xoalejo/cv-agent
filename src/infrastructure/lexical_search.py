@@ -1,14 +1,15 @@
 """Búsqueda léxica sobre el perfil, con procedencia.
 
 Implementa el puerto `ProfileSearch`. La elección es deliberada y proporcional al
-corpus: el perfil completo son unas 1,500 palabras en dos idiomas. Un índice
+corpus: el perfil completo son unas 1,500 palabras. Un índice
 vectorial añadiría un servicio que operar, una dependencia que mantener y latencia
 de red por consulta, sin mejorar de forma medible el recall sobre un texto de este
 tamaño. Al quedar detrás del puerto, cambiarlo por embeddings más adelante no toca
 el caso de uso.
 
-El índice cubre español e inglés simultáneamente: quien pregunta en inglés por
-"traceability" encuentra el mismo material que quien pregunta por "trazabilidad".
+El corpus está en español. El prompt instruye al modelo a formular la consulta en
+español aunque converse en otro idioma, de modo que la búsqueda opera siempre
+sobre el mismo vocabulario que el índice.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ import unicodedata
 from dataclasses import dataclass
 
 from src.domain.fragment import ProfileFragment, Section
-from src.domain.profile import Language, LocalizedText, Profile
+from src.domain.profile import Profile
 
 # Palabras que aparecen en casi cualquier consulta y no discriminan nada. Se
 # escriben como texto y se parten en tiempo de importación: una lista literal de
@@ -57,17 +58,19 @@ def _content_tokens(text: str) -> set[str]:
 
 @dataclass(frozen=True)
 class _IndexEntry:
-    """Una entrada del índice: el texto en ambos idiomas más su procedencia."""
+    """Una entrada del índice: el texto más su procedencia."""
 
-    text: LocalizedText
+    text: str
     section: Section
     context: str | None
     tokens: set[str]
     normalized: str
+    #: Palabras del fragmento, para la coincidencia por prefijo.
+    words: tuple[str, ...]
 
-    def to_fragment(self, language: Language) -> ProfileFragment:
+    def to_fragment(self) -> ProfileFragment:
         return ProfileFragment(
-            text=self.text.get(language),
+            text=self.text,
             section=self.section,
             context=self.context,
         )
@@ -82,17 +85,18 @@ class LexicalProfileSearch:
     # -- construcción ---------------------------------------------------------
 
     @staticmethod
-    def _entry(text: LocalizedText, section: Section, context: str | None) -> _IndexEntry:
-        # Se indexan ambos idiomas juntos: la consulta encuentra el fragmento sin
-        # importar en qué idioma esté formulada.
-        combined = f"{text.es} {text.en}"
+    def _entry(text: str, section: Section, context: str | None) -> _IndexEntry:
+        # El contexto (empresa, proyecto) entra en los tokens para que buscar por
+        # el nombre de una empresa recupere también sus logros.
         extra = context or ""
+        normalized = _normalize(text)
         return _IndexEntry(
             text=text,
             section=section,
             context=context,
-            tokens=_content_tokens(f"{combined} {extra}"),
-            normalized=_normalize(combined),
+            tokens=_content_tokens(f"{text} {extra}"),
+            normalized=normalized,
+            words=tuple(_WORD.findall(normalized)),
         )
 
     @classmethod
@@ -103,15 +107,9 @@ class LexicalProfileSearch:
         ]
 
         for experience in profile.experiences:
-            header = LocalizedText(
-                es=(
-                    f"{experience.role.es} en {experience.company} "
-                    f"({experience.period}). {experience.company_description.es}"
-                ),
-                en=(
-                    f"{experience.role.en} at {experience.company} "
-                    f"({experience.period}). {experience.company_description.en}"
-                ),
+            header = (
+                f"{experience.role} en {experience.company} "
+                f"({experience.period}). {experience.company_description}"
             )
             entries.append(cls._entry(header, Section.EXPERIENCE, experience.company))
             for achievement in experience.achievements:
@@ -120,74 +118,41 @@ class LexicalProfileSearch:
                 )
 
         for education in profile.education:
-            text = LocalizedText(
-                es=f"{education.degree.es}. {education.institution} ({education.period}).",
-                en=f"{education.degree.en}. {education.institution} ({education.period}).",
-            )
+            text = f"{education.degree}. {education.institution} ({education.period})."
             entries.append(cls._entry(text, Section.EDUCATION, education.institution))
 
         for category in profile.skill_categories:
-            skills = ", ".join(category.skills)
-            text = LocalizedText(
-                es=f"{category.name.es}: {skills}.",
-                en=f"{category.name.en}: {skills}.",
-            )
-            entries.append(cls._entry(text, Section.SKILLS, category.name.es))
+            text = f"{category.name}: {', '.join(category.skills)}."
+            entries.append(cls._entry(text, Section.SKILLS, category.name))
 
         for certification in profile.certifications:
-            text = LocalizedText(
-                es=(
-                    f"{certification.name.es} — {certification.issuer} "
-                    f"({certification.year.es})."
-                ),
-                en=(
-                    f"{certification.name.en} — {certification.issuer} "
-                    f"({certification.year.en})."
-                ),
+            text = (
+                f"{certification.name} — {certification.issuer} ({certification.year})."
             )
             entries.append(cls._entry(text, Section.CERTIFICATIONS, certification.issuer))
 
         for patent in profile.patents:
-            text = LocalizedText(
-                es=(
-                    f"{patent.title.es} Expediente IMPI {patent.file_number}. "
-                    f"{patent.status.es}."
-                ),
-                en=(
-                    f"{patent.title.en} IMPI file {patent.file_number}. "
-                    f"{patent.status.en}."
-                ),
+            text = (
+                f"{patent.title} Expediente IMPI {patent.file_number}. {patent.status}."
             )
             entries.append(cls._entry(text, Section.PATENTS, patent.file_number))
 
         for project in profile.projects:
-            text = LocalizedText(
-                es=f"{project.name.es} ({project.period}). {project.description.es}",
-                en=f"{project.name.en} ({project.period}). {project.description.en}",
-            )
-            entries.append(cls._entry(text, Section.PROJECTS, project.name.es))
+            text = f"{project.name} ({project.period}). {project.description}"
+            entries.append(cls._entry(text, Section.PROJECTS, project.name))
 
         for recognition in profile.recognitions:
             entries.append(cls._entry(recognition.description, Section.RECOGNITIONS, None))
 
         for language_skill in profile.languages:
-            text = LocalizedText(
-                es=f"{language_skill.name.es}: {language_skill.level.es}.",
-                en=f"{language_skill.name.en}: {language_skill.level.en}.",
-            )
+            text = f"{language_skill.name}: {language_skill.level}."
             entries.append(cls._entry(text, Section.LANGUAGES, None))
 
         return tuple(entries)
 
     # -- consulta -------------------------------------------------------------
 
-    def search(
-        self,
-        query: str,
-        *,
-        language: Language = "es",
-        limit: int = 5,
-    ) -> list[ProfileFragment]:
+    def search(self, query: str, *, limit: int = 5) -> list[ProfileFragment]:
         query_tokens = _content_tokens(query)
         if not query_tokens:
             return []
@@ -200,10 +165,17 @@ class LexicalProfileSearch:
             score = float(len(overlap))
 
             # Un término que no coincide como palabra completa puede seguir siendo
-            # relevante como subcadena: "rag" dentro de "ragas", "kube" en
-            # "kubernetes". Vale menos que una coincidencia exacta.
+            # relevante como prefijo: "kube" en "kubernetes", "automat" en
+            # "automatización". Vale menos que una coincidencia exacta.
+            #
+            # La coincidencia se ancla al inicio de palabra a propósito. Buscar la
+            # subcadena en cualquier posición produce falsos positivos que cruzan
+            # idiomas —"files" dentro de "perfiles"— y ensucian los resultados con
+            # fragmentos que no tienen relación con la consulta.
             for token in query_tokens - overlap:
-                if len(token) > 3 and token in entry.normalized:
+                if len(token) > 3 and any(
+                    word.startswith(token) for word in entry.words
+                ):
                     score += 0.5
 
             # La consulta completa presente literalmente es la señal más fuerte.
@@ -216,4 +188,4 @@ class LexicalProfileSearch:
                 scored.append((score, -position, entry))
 
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
-        return [entry.to_fragment(language) for _, _, entry in scored[:limit]]
+        return [entry.to_fragment() for _, _, entry in scored[:limit]]

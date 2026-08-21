@@ -19,27 +19,31 @@ class TestRecall:
         # RAG aparece tanto en ABBA Networks como en Remote Data Consulting.
         assert len([c for c in companies if c]) >= 2
 
-    def test_consulta_en_ingles_encuentra_contenido_en_espanol(
+    def test_la_consulta_en_espanol_encuentra_el_material(
         self, search: LexicalProfileSearch
     ) -> None:
-        spanish = search.search("trazabilidad industrial", limit=3)
-        english = search.search("industrial traceability", limit=3)
+        results = search.search("trazabilidad industrial", limit=3)
 
-        assert spanish and english
-        # El índice cubre ambos idiomas, así que ambas consultas llegan al mismo
-        # material: la de Arbomex.
-        assert any(r.context == "Arbomex S.A. de C.V." for r in spanish)
-        assert any(r.context == "Arbomex S.A. de C.V." for r in english)
+        assert results
+        assert any(r.context == "Arbomex S.A. de C.V." for r in results)
 
-    def test_devuelve_el_texto_en_el_idioma_pedido(
+    def test_los_terminos_tecnicos_funcionan_en_cualquier_idioma(
         self, search: LexicalProfileSearch
     ) -> None:
-        spanish = search.search("Databricks", language="es", limit=1)
-        english = search.search("Databricks", language="en", limit=1)
+        """Los nombres propios de tecnología no se traducen, así que coinciden igual."""
+        for termino in ("Databricks", "Kubernetes", "Pinecone", "RAG"):
+            assert search.search(termino, limit=1), f"{termino} debería encontrarse"
 
-        assert spanish and english
-        assert "archivos mensuales" in spanish[0].text
-        assert "files monthly" in english[0].text
+    def test_el_corpus_esta_en_espanol(self, search: LexicalProfileSearch) -> None:
+        """El prompt instruye consultar en español; esta prueba fija esa premisa.
+
+        Una consulta con vocabulario únicamente en inglés no recupera el
+        fragmento equivalente: es la contrapartida conocida de mantener una sola
+        versión del contenido, y por eso el modelo traduce la consulta antes de
+        buscar.
+        """
+        assert search.search("archivos mensuales", limit=1)
+        assert search.search("monthly files reporting", limit=1) == []
 
     def test_tolera_acentos_y_mayusculas(self, search: LexicalProfileSearch) -> None:
         con_acento = search.search("automatización", limit=3)

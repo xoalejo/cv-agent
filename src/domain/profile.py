@@ -3,6 +3,12 @@
 Capa de dominio: no importa nada fuera de la biblioteca estándar. Aquí vive el
 *qué* es un perfil, sin saber de dónde salen los datos (infraestructura) ni cómo
 se conversa sobre ellos (aplicación).
+
+El perfil se almacena **solo en español**, que es el idioma canónico del CV. El
+agente responde en el idioma de quien pregunta traduciendo en el momento, en lugar
+de mantener una segunda copia del contenido. Guardar dos versiones obligaría a
+actualizar ambas y permitiría que divergieran; con una sola no existe esa clase de
+error.
 """
 
 from __future__ import annotations
@@ -11,24 +17,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 Language = Literal["es", "en"]
-
-
-@dataclass(frozen=True)
-class LocalizedText:
-    """Texto con su versión en español e inglés.
-
-    El agente es bilingüe y responde en el idioma en que le preguntan. Mantener
-    ambas versiones juntas en el mismo objeto evita que los datos se
-    desincronicen entre idiomas, que es exactamente el defecto que traían los
-    PDFs originales (un reconocimiento decía "300 proyectos" en español y "60"
-    en inglés).
-    """
-
-    es: str
-    en: str
-
-    def get(self, language: Language) -> str:
-        return self.en if language == "en" else self.es
 
 
 @dataclass(frozen=True)
@@ -47,61 +35,61 @@ class ContactChannel:
 @dataclass(frozen=True)
 class Experience:
     company: str
-    role: LocalizedText
+    role: str
     period: str
-    company_description: LocalizedText
-    achievements: tuple[LocalizedText, ...]
+    company_description: str
+    achievements: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class Education:
-    degree: LocalizedText
+    degree: str
     institution: str
     period: str
 
 
 @dataclass(frozen=True)
 class Certification:
-    name: LocalizedText
+    name: str
     issuer: str
-    year: LocalizedText
+    year: str
 
 
 @dataclass(frozen=True)
 class Patent:
     """Patente en trámite ante el IMPI.
 
-    Los títulos oficiales están registrados en español; `title.en` es una
-    traducción de cortesía y así se declara al usuario cuando corresponde.
+    Los títulos son los oficiales registrados en español; al responder en otro
+    idioma se traducen como cortesía, pero el título registrado es este.
     """
 
-    title: LocalizedText
+    title: str
     file_number: str
-    status: LocalizedText
+    status: str
 
 
 @dataclass(frozen=True)
 class Project:
-    name: LocalizedText
+    name: str
     period: str
-    description: LocalizedText
+    description: str
 
 
 @dataclass(frozen=True)
 class Recognition:
-    description: LocalizedText
+    description: str
 
 
 @dataclass(frozen=True)
 class SkillCategory:
-    name: LocalizedText
+    name: str
     skills: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class LanguageSkill:
-    name: LocalizedText
-    level: LocalizedText
+    name: str
+    level: str
 
 
 @dataclass(frozen=True)
@@ -109,9 +97,9 @@ class Profile:
     """Raíz del agregado: todo lo que el agente puede llegar a decir."""
 
     full_name: str
-    headline: LocalizedText
-    location: LocalizedText
-    summary: LocalizedText
+    headline: str
+    location: str
+    summary: str
     years_of_experience: int
     contact_channels: tuple[ContactChannel, ...]
     experiences: tuple[Experience, ...]
@@ -141,7 +129,7 @@ class Profile:
         if not needle:
             return None
         for project in self.projects:
-            if needle in project.name.es.lower() or needle in project.name.en.lower():
+            if needle in project.name.lower():
                 return project
         return None
 
@@ -150,6 +138,6 @@ class Profile:
         if not needle:
             return None
         for category in self.skill_categories:
-            if needle in category.name.es.lower() or needle in category.name.en.lower():
+            if needle in category.name.lower():
                 return category
         return None

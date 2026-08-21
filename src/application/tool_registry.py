@@ -19,15 +19,7 @@ from typing import Any
 
 from src.application.ports import ProfileRepository, ProfileSearch
 from src.domain.policies import allowed_contact_channels
-from src.domain.profile import Language, Profile
-
-_LANGUAGE_PARAM = {
-    "type": "string",
-    "enum": ["es", "en"],
-    "description": (
-        "Idioma en el que devolver el contenido. Usa el idioma de la conversación."
-    ),
-}
+from src.domain.profile import Profile
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
@@ -38,7 +30,8 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "procedencia (sección y empresa o proyecto). Úsala para preguntas que cruzan "
             "varias secciones —por ejemplo dónde ha usado una tecnología, qué experiencia "
             "tiene en un sector, o qué respalda una habilidad concreta— y cuando quieras "
-            "citar de dónde sale un dato. Funciona en español y en inglés."
+            "citar de dónde sale un dato. **Formula la consulta siempre en español**, "
+            "aunque converses en otro idioma: el CV está redactado en español."
         ),
         "parameters": {
             "type": "object",
@@ -50,7 +43,6 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                         "o 'sector financiero'."
                     ),
                 },
-                "language": _LANGUAGE_PARAM,
             },
             "required": ["query"],
             "additionalProperties": False,
@@ -72,7 +64,6 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                         "Nombre parcial de la empresa: 'ABBA', 'Remote Data' o 'Arbomex'."
                     ),
                 },
-                "language": _LANGUAGE_PARAM,
             },
             "additionalProperties": False,
         },
@@ -91,7 +82,6 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": "Nombre parcial del proyecto.",
                 },
-                "language": _LANGUAGE_PARAM,
             },
             "additionalProperties": False,
         },
@@ -104,7 +94,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         ),
         "parameters": {
             "type": "object",
-            "properties": {"language": _LANGUAGE_PARAM},
+            "properties": {},
             "additionalProperties": False,
         },
     },
@@ -117,7 +107,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         ),
         "parameters": {
             "type": "object",
-            "properties": {"language": _LANGUAGE_PARAM},
+            "properties": {},
             "additionalProperties": False,
         },
     },
@@ -135,7 +125,6 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": "Nombre parcial de la categoría, por ejemplo 'cloud'.",
                 },
-                "language": _LANGUAGE_PARAM,
             },
             "additionalProperties": False,
         },
@@ -155,10 +144,6 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
 ]
 
-
-def _language_of(arguments: dict[str, Any]) -> Language:
-    value = arguments.get("language")
-    return "en" if value == "en" else "es"
 
 
 class ToolRegistry:
@@ -207,8 +192,7 @@ class ToolRegistry:
         if not query:
             return {"matches": [], "note": "La consulta venía vacía."}
 
-        language = _language_of(arguments)
-        fragments = self._search.search(query, language=language, limit=5)
+        fragments = self._search.search(query, limit=5)
         return {
             "query": query,
             "matches": [
@@ -224,16 +208,15 @@ class ToolRegistry:
 
     @staticmethod
     def _get_experience(profile: Profile, arguments: dict[str, Any]) -> Any:
-        language = _language_of(arguments)
         company = str(arguments.get("company", "")).strip()
 
         def render(experience: Any) -> dict[str, Any]:
             return {
                 "company": experience.company,
-                "role": experience.role.get(language),
+                "role": experience.role,
                 "period": experience.period,
-                "company_description": experience.company_description.get(language),
-                "achievements": [a.get(language) for a in experience.achievements],
+                "company_description": experience.company_description,
+                "achievements": [a for a in experience.achievements],
             }
 
         if company:
@@ -250,14 +233,13 @@ class ToolRegistry:
 
     @staticmethod
     def _get_projects(profile: Profile, arguments: dict[str, Any]) -> Any:
-        language = _language_of(arguments)
         name = str(arguments.get("name", "")).strip()
 
         def render(project: Any) -> dict[str, Any]:
             return {
-                "name": project.name.get(language),
+                "name": project.name,
                 "period": project.period,
-                "description": project.description.get(language),
+                "description": project.description,
             }
 
         if name:
@@ -265,7 +247,7 @@ class ToolRegistry:
             if match is None:
                 return {
                     "error": f"No hay proyecto registrado con el nombre '{name}'.",
-                    "available": [p.name.get(language) for p in profile.projects],
+                    "available": [p.name for p in profile.projects],
                 }
             return render(match)
 
@@ -273,19 +255,17 @@ class ToolRegistry:
 
     @staticmethod
     def _get_certifications(profile: Profile, arguments: dict[str, Any]) -> Any:
-        language = _language_of(arguments)
         return [
             {
-                "name": certification.name.get(language),
+                "name": certification.name,
                 "issuer": certification.issuer,
-                "year": certification.year.get(language),
+                "year": certification.year,
             }
             for certification in profile.certifications
         ]
 
     @staticmethod
     def _get_patents(profile: Profile, arguments: dict[str, Any]) -> Any:
-        language = _language_of(arguments)
         return {
             "note": (
                 "Patentes en trámite ante el IMPI. Los títulos oficiales están "
@@ -293,9 +273,9 @@ class ToolRegistry:
             ),
             "patents": [
                 {
-                    "title": patent.title.get(language),
+                    "title": patent.title,
                     "file_number": patent.file_number,
-                    "status": patent.status.get(language),
+                    "status": patent.status,
                 }
                 for patent in profile.patents
             ],
@@ -303,7 +283,6 @@ class ToolRegistry:
 
     @staticmethod
     def _get_tech_stack(profile: Profile, arguments: dict[str, Any]) -> Any:
-        language = _language_of(arguments)
         category = str(arguments.get("category", "")).strip()
 
         if category:
@@ -311,12 +290,12 @@ class ToolRegistry:
             if match is None:
                 return {
                     "error": f"No hay categoría '{category}' en el stack.",
-                    "available": [c.name.get(language) for c in profile.skill_categories],
+                    "available": [c.name for c in profile.skill_categories],
                 }
-            return {"category": match.name.get(language), "skills": list(match.skills)}
+            return {"category": match.name, "skills": list(match.skills)}
 
         return [
-            {"category": c.name.get(language), "skills": list(c.skills)}
+            {"category": c.name, "skills": list(c.skills)}
             for c in profile.skill_categories
         ]
 

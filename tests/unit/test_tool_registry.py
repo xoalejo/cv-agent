@@ -59,11 +59,19 @@ class TestExecution:
         assert result["period"] == "Nov 2024 – Abr 2026"
         assert len(result["achievements"]) == 7
 
-    def test_experiencia_en_ingles(self, tools: ToolRegistry) -> None:
-        result = tools.execute(
-            "get_experience", json.dumps({"company": "arbomex", "language": "en"})
-        )["result"]
-        assert result["role"] == "Automation Projects Engineer"
+    def test_las_herramientas_devuelven_el_contenido_en_espanol(
+        self, tools: ToolRegistry
+    ) -> None:
+        """El CV es la fuente canónica; traducir es tarea del modelo al responder."""
+        result = tools.execute("get_experience", json.dumps({"company": "arbomex"}))[
+            "result"
+        ]
+        assert result["role"] == "Ingeniero de Proyectos en Automatización"
+
+    def test_ningun_parametro_de_idioma_en_las_definiciones(self) -> None:
+        """Sin doble versión del contenido, elegir idioma dejó de tener sentido."""
+        for definition in TOOL_DEFINITIONS:
+            assert "language" not in definition["parameters"].get("properties", {})
 
     def test_empresa_inexistente_devuelve_error_util(self, tools: ToolRegistry) -> None:
         result = tools.execute("get_experience", json.dumps({"company": "Google"}))["result"]

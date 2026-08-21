@@ -25,18 +25,18 @@ class TestProfileGrounding:
         assert "Certified ScrumMaster" in instructions
         assert "MX/a/2024/016162" in instructions
 
-    def test_incluye_ambos_idiomas(self, profile: Profile) -> None:
+    def test_el_perfil_aparece_una_sola_vez(self, profile: Profile) -> None:
+        """Sin copia traducida no hay forma de que las dos versiones divergan."""
         instructions = build_instructions(profile)
 
-        assert "Digital Transformation Specialist" in instructions
-        assert "Especialista en Transformación Digital" in instructions
+        assert instructions.count("Especialista en Transformación Digital") == 1
+        assert "Digital Transformation Specialist" not in instructions
 
-    def test_las_cifras_coinciden_entre_idiomas(self, profile: Profile) -> None:
-        """Un mismo dato no puede diferir según el idioma en que se responda."""
+    def test_incluye_los_datos_cuantitativos(self, profile: Profile) -> None:
         instructions = build_instructions(profile)
 
         assert "Entre 300 proyectos" in instructions
-        assert "Among 300 national projects" in instructions
+        assert "17,000+" in instructions
 
 
 class TestDisclosure:
@@ -62,6 +62,21 @@ class TestBehaviourRules:
         instructions = build_instructions(profile)
 
         assert "Detecta el idioma" in instructions
+
+    def test_instruye_traducir_conservando_nombres_propios(
+        self, profile: Profile
+    ) -> None:
+        """El contenido se traduce; empresas y expedientes no."""
+        instructions = " ".join(build_instructions(profile).split())
+
+        assert "traduce el contenido al responder" in instructions
+        assert "conserva sin traducir" in instructions
+
+    def test_instruye_buscar_en_espanol(self, profile: Profile) -> None:
+        """El índice está en español: consultar en otro idioma recupera menos."""
+        instructions = " ".join(build_instructions(profile).split())
+
+        assert "Consulta las herramientas siempre en español" in instructions
 
     def test_instruye_no_inventar(self, profile: Profile) -> None:
         instructions = build_instructions(profile)

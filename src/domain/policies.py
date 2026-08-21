@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import re
 
-from src.domain.profile import ContactChannel, Language, LocalizedText
+from src.domain.profile import ContactChannel, Language
 
 #: Canales que el agente puede compartir. El teléfono queda fuera por diseño.
 ALLOWED_CONTACT_KINDS: frozenset[str] = frozenset({"email", "linkedin", "github"})
@@ -83,21 +83,9 @@ def redact_contact_data(text: str, language: Language = "es") -> str:
 #: Temas que el agente declina con cortesía, redirigiendo a contacto directo.
 #: Se declaran aquí para que el prompt y las pruebas lean la misma fuente y no
 #: se desincronicen.
-OUT_OF_SCOPE_TOPICS: tuple[LocalizedText, ...] = (
-    LocalizedText(
-        es="expectativas salariales o condiciones económicas",
-        en="salary expectations or compensation terms",
-    ),
-    LocalizedText(
-        es="opiniones políticas, religiosas o personales",
-        en="political, religious or personal opinions",
-    ),
-    LocalizedText(
-        es="datos personales sensibles (domicilio, teléfono, familia, salud)",
-        en="sensitive personal data (home address, phone, family, health)",
-    ),
-    LocalizedText(
-        es="temas ajenos a la trayectoria profesional",
-        en="topics unrelated to the professional background",
-    ),
+OUT_OF_SCOPE_TOPICS: tuple[str, ...] = (
+    "expectativas salariales o condiciones económicas",
+    "opiniones políticas, religiosas o personales",
+    "datos personales sensibles (domicilio, teléfono, familia, salud)",
+    "temas ajenos a la trayectoria profesional",
 )

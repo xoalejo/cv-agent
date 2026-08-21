@@ -96,10 +96,11 @@ class TestProfileDataHygiene:
         assert "phone" not in kinds
 
     def test_ningun_texto_del_perfil_parece_telefono(self, profile: Profile) -> None:
-        blobs: list[str] = [profile.summary.es, profile.summary.en]
+        blobs: list[str] = [profile.summary, profile.headline]
         for experience in profile.experiences:
-            blobs.extend(a.es for a in experience.achievements)
-            blobs.extend(a.en for a in experience.achievements)
+            blobs.extend(experience.achievements)
+        for patent in profile.patents:
+            blobs.append(f"{patent.title} {patent.file_number}")
         for channel in profile.contact_channels:
             blobs.append(channel.value)
 

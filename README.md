@@ -91,7 +91,7 @@ Pruebas y evaluación:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                              # 113 pruebas, sin red
+pytest                                              # 117 pruebas, sin red
 python evals/run_evals.py --base-url http://localhost:8000
 ```
 
@@ -165,19 +165,20 @@ No por dogma. Se justifica por dos cosas medibles:
    OpenAI sustituible. Es la misma tesis que sostiene a Open Responses —desacoplar
    el agente del proveedor— aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
-   sin llamar a ningún servicio: **113 pruebas en ~1.4 s, sin gastar un token**.
+   sin llamar a ningún servicio: **117 pruebas en ~1.3 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
 ### 3. Contexto completo, no RAG con base vectorial
 
-El perfil son ~1,500 palabras en dos idiomas: **cabe entero en el contexto**. Un
+El perfil son ~1,500 palabras: **cabe entero en el contexto**. Un
 pipeline de RAG con embeddings y base vectorial sobre un corpus de ese tamaño
 añade un servicio que operar, una dependencia que mantener y latencia por
 consulta, sin mejorar el recall de forma medible. Habría sido acumular tecnología
 sin una razón clara.
 
-Para la búsqueda transversal se usa un **índice léxico en memoria** (normalización
-sin acentos, coincidencia por términos, cobertura simultánea ES/EN). Queda detrás
+Para la búsqueda transversal se usa un **índice léxico en memoria**: normalización
+sin acentos y coincidencia por términos, con los prefijos anclados a inicio de
+palabra para no arrastrar falsos positivos. Queda detrás
 del puerto `ProfileSearch`, así que sustituirlo por embeddings el día que el
 corpus crezca no toca el caso de uso: la decisión está argumentada *y* es
 reversible.
@@ -237,15 +238,29 @@ Responde en tercera persona. Un endpoint público que simula ser una persona rea
 plantea un problema de transparencia que un asistente representando un perfil no
 tiene, y deja claro a quien pregunta que conversa con un sistema.
 
-### 8. Un solo perfil bilingüe, no dos copias
+### 8. Un solo idioma canónico, traducción en el momento
 
-El perfil vive como una estructura de datos única donde cada campo lleva su
-versión en español e inglés en el mismo objeto. Mantener dos documentos paralelos
-haría que cualquier actualización tuviera que aplicarse dos veces, y una omisión
-produciría respuestas distintas según el idioma de la pregunta.
+El perfil se almacena **solo en español**, el idioma original del CV. Cuando la
+pregunta llega en inglés, el agente traduce al responder en lugar de leer de una
+segunda copia del contenido.
 
-Esa misma estructura alimenta el system prompt y las herramientas, de modo que no
-existan dos versiones de la misma verdad dentro del sistema.
+La alternativa —mantener ambas versiones en los datos— obliga a aplicar cada
+actualización dos veces, y una omisión produce respuestas distintas según el
+idioma en que se pregunte. Con una sola versión esa clase de error no existe.
+
+Tiene además un efecto medible: el prompt pasó de ~5,500 a ~3,700 tokens, **un
+33% menos en cada llamada**. El perfil viaja completo en cada turno, así que ese
+ahorro se repite en toda la conversación.
+
+Dos consecuencias que el diseño asume explícitamente:
+
+- **La traducción es generada, no curada.** El prompt fija qué debe conservarse
+  sin traducir: nombres de empresas e instituciones, números de expediente,
+  normas y los títulos oficiales de las patentes, registrados en español.
+- **El índice de búsqueda está en español.** Una consulta con vocabulario solo en
+  inglés recupera menos, así que el prompt instruye al modelo a formular la
+  consulta en español aunque converse en otro idioma. Traducir un término de
+  búsqueda es trivial para el modelo; mantener un corpus duplicado no lo es.
 
 ---
 
@@ -328,7 +343,7 @@ pruebas*.
 ### Pruebas unitarias e integración — sin red
 
 ```bash
-pytest -q     # 113 pruebas en ~1.4 s
+pytest -q     # 117 pruebas en ~1.3 s
 ```
 
 Cubren las políticas de divulgación (incluidos los falsos positivos), la búsqueda
@@ -468,7 +483,7 @@ src/
 │   └── security.py         # Auth y límite de tasa
 └── config.py
 
-tests/          # 113 pruebas, sin red
+tests/          # 117 pruebas, sin red
 evals/          # 22 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```

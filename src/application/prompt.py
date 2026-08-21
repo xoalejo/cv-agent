@@ -4,9 +4,15 @@ El prompt se genera desde el perfil y desde las políticas de dominio, nunca se
 escribe a mano en paralelo a los datos. Si el CV cambia, el prompt cambia con él.
 
 Sobre la voz: el agente habla **de** Oscar Alejo en tercera persona, no **como**
-él. Un endpoint público que se hace pasar por una persona real es una decisión que
-habría que justificar ante quien evalúa; un asistente que representa un perfil no
-lo necesita. Además hace evidente para quien pregunta que conversa con un sistema.
+él. Un endpoint público que simula ser una persona real plantea un problema de
+transparencia que un asistente representando un perfil no tiene, y deja claro a
+quien pregunta que conversa con un sistema.
+
+Sobre el idioma: el perfil está en español, que es su idioma canónico. Responder
+en inglés se resuelve traduciendo en el momento en lugar de arrastrar una segunda
+copia del contenido. Eso elimina por construcción la posibilidad de que las dos
+versiones digan cosas distintas, y reduce el prompt de forma notable en cada
+llamada.
 """
 
 from __future__ import annotations
@@ -24,9 +30,21 @@ respondes como si fueras él.
 
 # Idioma
 
+El perfil que aparece más abajo está redactado en español, porque es el idioma
+original del CV.
+
 Detecta el idioma del último mensaje y responde en ese mismo idioma. Si preguntan
-en español respondes en español; si preguntan en inglés respondes en inglés. No
-mezcles idiomas dentro de una respuesta ni anuncies el cambio.
+en inglés, **traduce el contenido al responder**: no reproduzcas el español ni
+anuncies que estás traduciendo. No mezcles idiomas dentro de una respuesta.
+
+Al traducir, conserva sin traducir:
+
+- Nombres de empresas, instituciones y productos (ABBA Networks, EGADE Business
+  School, Databricks, Power BI).
+- Números de expediente, normas y certificaciones (MX/a/2024/008296, IATF 16949,
+  Certified ScrumMaster).
+- Los títulos oficiales de las patentes, que están registrados en español ante el
+  IMPI. Puedes ofrecer una traducción de cortesía junto al título original.
 
 # Fundamento de las respuestas
 
@@ -45,6 +63,9 @@ abajo o en el resultado de una herramienta. Reglas:
   "¿dónde ha usado RAG?" o "¿qué experiencia tiene en el sector financiero?"), y
   las herramientas específicas cuando pregunten por una empresa, proyecto o
   categoría concreta. Las herramientas devuelven la procedencia de cada dato.
+- **Consulta las herramientas siempre en español**, sea cual sea el idioma de la
+  conversación: el CV está redactado en español y una consulta en otro idioma
+  encontrará menos. Si te preguntan por "traceability", busca "trazabilidad".
 
 # Límites
 
@@ -72,80 +93,68 @@ ofrece profundizar.
 
 
 def _render_profile(profile: Profile) -> str:
-    """Vuelca el perfil completo en texto, en ambos idiomas donde aporta."""
+    """Vuelca el perfil completo en texto."""
     lines: list[str] = []
     add = lines.append
 
-    add("# Perfil de " + profile.full_name)
+    add(f"# Perfil de {profile.full_name}")
     add("")
-    add(f"**Titular:** {profile.headline.es} / {profile.headline.en}")
-    add(f"**Ubicación:** {profile.location.es}")
+    add(f"**Titular:** {profile.headline}")
+    add(f"**Ubicación:** {profile.location}")
     add(f"**Años de experiencia:** {profile.years_of_experience}")
     add("")
     add("## Resumen profesional")
     add("")
-    add(f"[ES] {profile.summary.es}")
-    add("")
-    add(f"[EN] {profile.summary.en}")
+    add(profile.summary)
     add("")
 
     add("## Experiencia profesional")
     for experience in profile.experiences:
         add("")
         add(f"### {experience.company} — {experience.period}")
-        add(f"Puesto: {experience.role.es} / {experience.role.en}")
-        add(f"Contexto: {experience.company_description.es}")
+        add(f"Puesto: {experience.role}")
+        add(f"Contexto: {experience.company_description}")
         add("Logros:")
         for achievement in experience.achievements:
-            add(f"- [ES] {achievement.es}")
-            add(f"  [EN] {achievement.en}")
+            add(f"- {achievement}")
     add("")
 
     add("## Formación académica")
     for education in profile.education:
-        add(
-            f"- {education.degree.es} / {education.degree.en} — "
-            f"{education.institution} ({education.period})"
-        )
+        add(f"- {education.degree} — {education.institution} ({education.period})")
     add("")
 
     add("## Idiomas")
     for language_skill in profile.languages:
-        add(f"- {language_skill.name.es}: {language_skill.level.es}")
+        add(f"- {language_skill.name}: {language_skill.level}")
     add("")
 
     add("## Stack técnico")
     for category in profile.skill_categories:
-        add(f"- **{category.name.es} / {category.name.en}:** {', '.join(category.skills)}")
+        add(f"- **{category.name}:** {', '.join(category.skills)}")
     add("")
 
     add("## Certificaciones")
     for certification in profile.certifications:
-        add(
-            f"- {certification.name.es} — {certification.issuer} "
-            f"({certification.year.es} / {certification.year.en})"
-        )
+        add(f"- {certification.name} — {certification.issuer} ({certification.year})")
     add("")
 
     add("## Patentes en trámite ante el IMPI")
-    add("(Los títulos oficiales están registrados en español.)")
+    add("(Títulos oficiales registrados en español.)")
     for patent in profile.patents:
-        add(f"- {patent.title.es}")
-        add(f"  [EN] {patent.title.en}")
-        add(f"  Expediente: {patent.file_number} — {patent.status.es}")
+        add(f"- {patent.title}")
+        add(f"  Expediente: {patent.file_number} — {patent.status}")
     add("")
 
     add("## Proyectos propios")
     for project in profile.projects:
-        add(f"### {project.name.es} / {project.name.en} ({project.period})")
-        add(f"[ES] {project.description.es}")
-        add(f"[EN] {project.description.en}")
+        add(f"### {project.name} ({project.period})")
+        add(project.description)
     add("")
 
     add("## Reconocimientos")
     for recognition in profile.recognitions:
-        add(f"- {recognition.description.es}")
-        add(f"  [EN] {recognition.description.en}")
+        add(f"- {recognition.description}")
     add("")
 
     add("## Canales de contacto disponibles")
@@ -169,7 +178,7 @@ def build_instructions(profile: Profile, *, caller_instructions: str | None = No
     prompt propio sería entregar el control del agente a quien lo consulta.
     """
     first_name = profile.full_name.split()[0]
-    out_of_scope = "\n".join(f"- {topic.es}" for topic in OUT_OF_SCOPE_TOPICS)
+    out_of_scope = "\n".join(f"- {topic}" for topic in OUT_OF_SCOPE_TOPICS)
 
     sections = [
         _RULES.format(

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from src.domain.fragment import ProfileFragment
-from src.domain.profile import Language, Profile
+from src.domain.profile import Profile
 
 
 @dataclass(frozen=True)
@@ -77,17 +77,10 @@ class ProfileRepository(Protocol):
 class ProfileSearch(Protocol):
     """Búsqueda sobre el perfil que devuelve fragmentos con procedencia."""
 
-    def search(
-        self,
-        query: str,
-        *,
-        language: Language = "es",
-        limit: int = 5,
-    ) -> list[ProfileFragment]:
-        """Busca en el perfil completo, sin importar el idioma de la consulta.
+    def search(self, query: str, *, limit: int = 5) -> list[ProfileFragment]:
+        """Busca en el perfil y devuelve fragmentos con su procedencia.
 
-        `language` determina el idioma del texto devuelto, no el de la búsqueda:
-        el índice cubre ambos idiomas para que "RAG" o "traceability" encuentren
-        lo mismo se pregunte como se pregunte.
+        El corpus está en español; el prompt instruye al modelo a consultar en ese
+        idioma aunque la conversación transcurra en otro.
         """
         ...
