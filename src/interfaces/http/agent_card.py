@@ -56,7 +56,21 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
         # El campo dentro de cada entrada es `protocolBinding`, no `transport`:
         # ese era el nombre en v0.3, y mezclarlos hace que un validador de v1.0
         # rechace la tarjeta entera.
+        # La lista va por orden de preferencia. La primera entrada identifica el
+        # protocolo concreto que habla el endpoint mediante el URI canónico de su
+        # especificación, que es lo que A2A recomienda para enlaces no estándar:
+        # `protocolBinding` es de forma libre y "debería ser un URI".
+        #
+        # La segunda describe el mismo endpoint en términos genéricos. Ambas son
+        # ciertas y apuntan a la misma URL: un cliente que busque Open Responses
+        # reconoce la primera, y uno que solo entienda los enlaces básicos de A2A
+        # se queda con la segunda.
         "supportedInterfaces": [
+            {
+                "url": base,
+                "protocolBinding": "https://www.openresponses.org/specification",
+                "protocolVersion": "1.0",
+            },
             {
                 "url": base,
                 "protocolBinding": "HTTP+JSON",
