@@ -1,0 +1,47 @@
+# --- Datos personales fuera del control de versiones -------------------------
+# Los PDFs del CV contienen el telefono personal, justo el dato que el agente
+# tiene prohibido revelar. GitHub indexa permanentemente lo que se sube, asi que
+# publicarlos contradiria la politica de divulgacion que el sistema implementa.
+# El perfil vive en el repo solo como datos estructurados, sin telefono.
+CV/
+*.pdf
+
+# --- Secretos ----------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+venv/
+.venv/
+env/
+ENV/
+
+# --- Testing / tooling -------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# --- Resultados de evaluacion ------------------------------------------------
+# Pueden contener respuestas completas del agente; se regeneran corriendo evals.
+evals/results/
+
+# --- Entorno local -----------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+fly.toml.bak
