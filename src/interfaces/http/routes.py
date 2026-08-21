@@ -8,7 +8,11 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from src.application.conversation import AnswerProfileQuestion
-from src.infrastructure.openai_engine import LLMEngineError
+from src.infrastructure.openai_engine import (
+    LLMConfigurationError,
+    LLMEngineError,
+    LLMRateLimitError,
+)
 from src.interfaces.http.schemas import ResponsesReply, ResponsesRequest
 from src.interfaces.http.security import authorize
 
@@ -76,6 +80,25 @@ async def create_response(
             payload.as_input_items(),
             caller_instructions=payload.instructions,
         )
+    except LLMRateLimitError as exc:
+        # Cuota del proveedor saturada. Es transitorio, así que se propaga como
+        # 429 con la espera sugerida: quien integra el agente puede reintentar
+        # con criterio en lugar de tratarlo como un servicio caído.
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "El proveedor del modelo alcanzó su límite de uso. "
+                "Reintenta en unos segundos."
+            ),
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from None
+    except LLMConfigurationError:
+        # Credencial o modelo mal configurados: el servicio no puede responder
+        # hasta que se corrija. Se distingue de una caída pasajera.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El agente no está configurado correctamente.",
+        ) from None
     except LLMEngineError:
         # El detalle ya quedó en los logs del adaptador; al cliente le llega un
         # error genérico para no filtrar interioridades del proveedor.

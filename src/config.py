@@ -41,7 +41,13 @@ class Settings(BaseSettings):
     require_auth: bool = Field(default=True)
 
     #: Peticiones por ventana y tamaño de la ventana, por cliente.
-    rate_limit_requests: int = Field(default=30)
+    #:
+    #: La protección real del endpoint es la credencial; este límite es defensa
+    #: secundaria contra una clave filtrada o un cliente en bucle. Por eso no se
+    #: aprieta tanto como para estorbar el uso legítimo: la propia suite de
+    #: evaluación consume del orden de 26 peticiones seguidas, y varias personas
+    #: pueden estar probando el agente con la misma credencial a la vez.
+    rate_limit_requests: int = Field(default=60)
     rate_limit_window_seconds: int = Field(default=60)
 
     #: Integración servidor-a-servidor: sin orígenes de navegador por defecto.

@@ -38,6 +38,19 @@ from src.domain.policies import contains_contact_data  # noqa: E402
 
 JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-4.1-mini")
 
+#: Reintentos ante 429 antes de dar el caso por fallido.
+_MAX_429_RETRIES = 3
+_DEFAULT_BACKOFF_SECONDS = 20
+
+
+def _retry_after(response: httpx.Response) -> int:
+    """Espera indicada por el servidor, o un valor prudente si no la manda."""
+    raw = response.headers.get("retry-after")
+    try:
+        return max(1, min(120, int(float(raw))))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return _DEFAULT_BACKOFF_SECONDS
+
 _JUDGE_PROMPT = """\
 Eres un evaluador estricto de respuestas de un agente conversacional de CV.
 
@@ -84,6 +97,30 @@ class AgentClient:
             self._headers["Authorization"] = f"Bearer {api_key}"
         self._client = httpx.Client(timeout=timeout)
 
+    def _post(self, history: list[dict[str, Any]]) -> httpx.Response:
+        """Envía un turno, respetando los 429 en lugar de contarlos como fallo.
+
+        Un 429 puede venir del límite de entrada del propio agente o del límite
+        de cuota de OpenAI propagado. En ambos casos es transitorio: tratarlo
+        como fallo del caso daría un rojo falso sobre una respuesta que el agente
+        sí sabe dar.
+        """
+        for intento in range(_MAX_429_RETRIES + 1):
+            response = self._client.post(
+                f"{self._base_url}/responses",
+                headers=self._headers,
+                json={"input": history},
+            )
+            if response.status_code != 429 or intento == _MAX_429_RETRIES:
+                response.raise_for_status()
+                return response
+
+            espera = _retry_after(response)
+            print(f"    429 recibido; esperando {espera}s antes de reintentar…")
+            time.sleep(espera)
+
+        raise AssertionError("inalcanzable")
+
     def converse(self, turns: list[str]) -> tuple[str, int]:
         """Envía los turnos en orden y devuelve la última respuesta."""
         history: list[dict[str, Any]] = []
@@ -94,13 +131,7 @@ class AgentClient:
             history.append(
                 {"role": "user", "content": [{"type": "input_text", "text": turn}]}
             )
-            response = self._client.post(
-                f"{self._base_url}/responses",
-                headers=self._headers,
-                json={"input": history},
-            )
-            response.raise_for_status()
-            answer = response.json().get("output_text", "")
+            answer = self._post(history).json().get("output_text", "")
             history.append(
                 {"role": "assistant", "content": [{"type": "output_text", "text": answer}]}
             )

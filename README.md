@@ -288,12 +288,40 @@ y métricas del CV (17,000 archivos, 140 máquinas, normas como IATF 16949).
 `CV/`). Contienen el teléfono, y GitHub indexa permanentemente lo que se sube:
 publicarlos contradiría la política que el propio sistema implementa.
 
+### Límites de tasa: tres capas distintas
+
+Un agente que llama a una API de pago tiene tres frentes de límite, y confundirlos
+lleva a presentar un problema transitorio como una avería.
+
+**1. Entrada — quién nos llama.** Ventana deslizante en memoria, **60 peticiones
+por minuto** por credencial o IP. La protección real del endpoint es la
+credencial; este límite es defensa secundaria contra una clave filtrada o un
+cliente en bucle. Por eso no se aprieta más: la propia suite de evaluación
+consume ~26 peticiones seguidas y varias personas pueden estar probando el agente
+con la misma clave a la vez. Un límite que estorba el uso legítimo no es
+seguridad, es una avería autoinfligida.
+
+**2. Salida — los límites de OpenAI.** El proveedor aplica cuotas de peticiones
+por minuto (RPM) y de **tokens por minuto (TPM)**. Como cada turno envía el perfil
+completo —del orden de 4-5k tokens de entrada—, **el límite que se alcanza primero
+es el de tokens, no el de peticiones**. El SDK reintenta con espera exponencial
+(`max_retries=3`) y absorbe los picos breves; si la cuota está saturada de verdad,
+el error se traduce en **HTTP 429 con `Retry-After`**, no en un 502. La distinción
+importa: un 502 dice "estoy roto" y un 429 dice "espera un momento".
+
+**3. Errores de configuración.** Una credencial inválida o un modelo inexistente
+devuelven **503**, no 429 ni 502: reintentar no lo arregla, hay que corregir la
+configuración. Tres causas distintas, tres códigos distintos.
+
+En los tres casos el detalle se queda en los logs. Un 429 de OpenAI que menciona
+la organización y los TPM de la cuenta nunca llega al cliente — *verificado con
+pruebas*.
+
 ### Otros controles
 
 | Control | Implementación |
 |---|---|
 | **Autenticación** | Bearer obligatorio, comparación en **tiempo constante** (`hmac.compare_digest`) para no filtrar la clave por temporización |
-| **Límite de tasa** | Ventana deslizante por credencial o IP; protege el presupuesto del proveedor |
 | **Secretos** | Solo por entorno / Fly secrets. `.env` en `.gitignore`, `.env.example` con placeholders |
 | **Validación** | Pydantic; estricta en lo propio, tolerante con campos extra del protocolo |
 | **CORS** | Cerrado por defecto. Es integración servidor-a-servidor, no un cliente de navegador. Nunca `*` |
@@ -409,6 +437,12 @@ Se declaran en lugar de presentarse como resueltas.
 - **Límite de tasa por instancia.** El estado vive en el proceso: con varias
   máquinas el límite es por máquina, no global. Suficiente para este alcance;
   hacerlo global requeriría Redis, una dependencia más que operar.
+- **Sin control de gasto por tokens.** Se limitan las peticiones, no los tokens
+  consumidos. Un cliente autenticado que envíe historiales muy largos gastaría
+  más por petición que uno normal. Está acotado por el tope de 200 elementos de
+  historial y por el límite de 5 vueltas de herramientas, pero no hay un
+  presupuesto de tokens explícito. Para producción real convendría añadirlo, junto
+  con alertas de gasto en el panel del proveedor.
 - **La continuidad depende del cliente.** Al ser stateless, un cliente que envíe
   solo el último mensaje sin historial obtendrá respuestas sin continuidad. Es una
   consecuencia deliberada del diseño, no un defecto.

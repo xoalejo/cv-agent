@@ -14,9 +14,13 @@ from fastapi.testclient import TestClient
 
 from src.application.conversation import AnswerProfileQuestion
 from src.application.tool_registry import ToolRegistry
-from src.config import get_settings
+from src.config import Settings, get_settings
 from src.infrastructure.lexical_search import LexicalProfileSearch
-from src.infrastructure.openai_engine import LLMEngineError
+from src.infrastructure.openai_engine import (
+    LLMConfigurationError,
+    LLMEngineError,
+    LLMRateLimitError,
+)
 from src.infrastructure.profile_data import StaticProfileRepository
 from src.interfaces.http.app import create_app
 from src.interfaces.http.security import reset_rate_limiter
@@ -299,3 +303,66 @@ class TestCors:
         )
 
         assert "access-control-allow-origin" not in response.headers
+
+
+class TestProviderRateLimits:
+    """El límite del proveedor es transitorio y debe distinguirse de una avería."""
+
+    @staticmethod
+    def _client_with(engine_exception: Exception) -> TestClient:
+        class FailingEngine:
+            def respond(self, **_: object) -> None:
+                raise engine_exception
+
+        app = create_app()
+        client = TestClient(app)
+        client.__enter__()
+        repository = StaticProfileRepository()
+        app.state.answer_question = AnswerProfileQuestion(
+            engine=FailingEngine(),  # type: ignore[arg-type]
+            profile_repository=repository,
+            tools=ToolRegistry(repository, LexicalProfileSearch(repository.get())),
+        )
+        return client
+
+    def test_cuota_del_proveedor_devuelve_429_no_502(self) -> None:
+        client = self._client_with(
+            LLMRateLimitError("rate limit exceeded", retry_after=17)
+        )
+        try:
+            response = client.post("/responses", json={"input": "hola"}, headers=AUTH)
+
+            assert response.status_code == 429
+            assert response.headers["Retry-After"] == "17"
+        finally:
+            client.__exit__(None, None, None)
+
+    def test_el_429_del_proveedor_no_filtra_detalles(self) -> None:
+        client = self._client_with(
+            LLMRateLimitError("org-abc123 exceeded 200000 TPM on gpt-4.1-mini")
+        )
+        try:
+            response = client.post("/responses", json={"input": "hola"}, headers=AUTH)
+
+            assert "org-abc123" not in response.text
+            assert "TPM" not in response.text
+        finally:
+            client.__exit__(None, None, None)
+
+    def test_configuracion_invalida_devuelve_503(self) -> None:
+        """Credencial o modelo mal configurados: reintentar no lo arregla."""
+        client = self._client_with(LLMConfigurationError("model not found"))
+        try:
+            response = client.post("/responses", json={"input": "hola"}, headers=AUTH)
+
+            assert response.status_code == 503
+            assert "model not found" not in response.text
+        finally:
+            client.__exit__(None, None, None)
+
+    def test_el_limite_por_defecto_cubre_la_suite_de_evals(self) -> None:
+        """La suite consume ~26 peticiones; el límite no debe estorbarla."""
+        from src.config import get_settings as settings_factory
+
+        settings_factory.cache_clear()
+        assert Settings().rate_limit_requests >= 30
