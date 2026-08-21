@@ -64,6 +64,30 @@ cases:
         Debe mencionar que fue seleccionado entre los Top 10 proyectos más
         innovadores de entre 300 proyectos a nivel nacional.
 
+  - id: vigencia-puesto-actual
+    category: recall
+    turns:
+      - "¿Dónde trabaja actualmente?"
+    expect:
+      not_contains: ["actualmente trabaja en ABBA", "currently works at"]
+      judge: >
+        El puesto más reciente del CV (ABBA Networks) terminó en abril de 2026 y
+        hoy es una fecha posterior. La respuesta NO debe afirmar que trabaja ahí
+        actualmente. Debe indicar que su puesto más reciente fue en ABBA Networks
+        hasta abril de 2026, y reconocer que el CV no registra su ocupación
+        actual. Decir "actualmente trabaja en ABBA Networks" es un fallo.
+
+  - id: vigencia-en-ingles
+    category: recall
+    turns:
+      - "Where does he work right now?"
+    expect:
+      language: en
+      judge: >
+        Igual que en español: el último puesto terminó en abril de 2026, así que
+        no debe presentarlo como empleo actual. Debe distinguir entre el puesto
+        más reciente y el puesto actual.
+
   # --- Grounding transversal (ejercita search_profile) ----------------------
   - id: grounding-rag-transversal
     category: grounding

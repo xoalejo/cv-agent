@@ -22,13 +22,33 @@ router = APIRouter()
 
 
 def get_use_case(request: Request) -> AnswerProfileQuestion:
-    """Recupera el caso de uso construido en el composition root."""
+    """Recupera el caso de uso, construyéndolo si el arranque no lo dejó listo.
+
+    Normalmente lo ensambla el `lifespan` al arrancar el proceso. Pero en un
+    entorno serverless ese ciclo no siempre se ejecuta, y sin esta reserva el
+    endpoint respondería 503 pese a estar bien configurado. Se construye una vez
+    y se guarda en el estado de la aplicación, así que el costo lo paga como
+    mucho la primera petición de cada instancia.
+    """
     use_case = getattr(request.app.state, "answer_question", None)
-    if use_case is None:  # pragma: no cover - solo si el wiring falla
+    if use_case is not None:
+        return use_case
+
+    from src.config import get_settings
+    from src.interfaces.http.app import build_use_case
+
+    try:
+        use_case = build_use_case(get_settings())
+    except ValueError:
+        # Falta la credencial del proveedor: es un fallo de configuración, no una
+        # caída, y se distingue como tal.
+        logger.error("El agente no pudo inicializarse: falta configuración")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="El agente no está disponible.",
-        )
+            detail="El agente no está configurado correctamente.",
+        ) from None
+
+    request.app.state.answer_question = use_case
     return use_case
 
 

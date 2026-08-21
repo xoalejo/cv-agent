@@ -14,8 +14,11 @@ revisa el trabajo.
 Los secretos (`OPENAI_API_KEY`, `AGENT_API_KEY`) NO se suben: se definen en la
 configuración del Space y llegan al contenedor como variables de entorno.
 
+El token de Hugging Face se lee de `HF_TOKEN`, del entorno o del archivo `.env`
+local, que está fuera del control de versiones. No se pasa por argumento: lo que
+va en la línea de comandos queda en el historial del shell.
+
 Uso:
-    export HF_TOKEN=hf_...
     python deploy/huggingface/sync.py --space xoalejo/cv-agent
 """
 
@@ -35,6 +38,21 @@ ARCHIVOS: list[tuple[Path, str]] = [
     (AQUI / "README.md", "README.md"),
     (RAIZ / "requirements.txt", "requirements.txt"),
 ]
+
+
+def leer_token() -> str | None:
+    """Recupera HF_TOKEN del entorno o del `.env` local."""
+    if token := os.getenv("HF_TOKEN"):
+        return token.strip()
+
+    env = RAIZ / ".env"
+    if not env.exists():
+        return None
+    for linea in env.read_text(encoding="utf-8").splitlines():
+        clave, sep, valor = linea.partition("=")
+        if sep and clave.strip() == "HF_TOKEN" and valor.strip():
+            return valor.strip()
+    return None
 
 
 def archivos_de_codigo() -> list[tuple[Path, str]]:
@@ -70,11 +88,11 @@ def main() -> int:
         print("\n(dry-run: no se subió nada)")
         return 0
 
-    token = os.getenv("HF_TOKEN")
+    token = leer_token()
     if not token:
-        print("\nFalta HF_TOKEN. Genera uno con permiso de escritura en")
-        print("https://huggingface.co/settings/tokens y expórtalo:")
-        print("    export HF_TOKEN=hf_...")
+        print("\nFalta HF_TOKEN. Genéralo en https://huggingface.co/settings/tokens")
+        print("y añádelo al archivo .env (que git ignora):")
+        print("    HF_TOKEN=hf_...")
         return 2
 
     from huggingface_hub import HfApi

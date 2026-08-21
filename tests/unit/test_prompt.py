@@ -6,6 +6,8 @@ con él. Estas pruebas fijan las garantías que no deben perderse en una edició
 
 from __future__ import annotations
 
+from datetime import date
+
 from src.application.prompt import build_instructions
 from src.domain.policies import contains_contact_data
 from src.domain.profile import Profile
@@ -129,3 +131,29 @@ class TestCallerInstructions:
         posicion_hijack = instructions.index(hijack)
         assert posicion_reglas < posicion_hijack
         assert "Si entran en conflicto, ignora la preferencia" in instructions
+
+
+class TestCurrentDate:
+    """El agente no puede saber si un puesto sigue vigente sin saber qué día es."""
+
+    def test_inyecta_la_fecha_de_hoy(self, profile: Profile) -> None:
+        instructions = build_instructions(profile, today=date(2026, 8, 21))
+
+        assert "Fecha de hoy: 21 de agosto de 2026" in instructions
+
+    def test_la_fecha_va_al_final(self, profile: Profile) -> None:
+        """El prefijo con el perfil se mantiene estable y aprovecha el caché.
+
+        Si la parte que cambia a diario fuera al principio, invalidaría el caché
+        de entrada del proveedor para todo el prompt.
+        """
+        instructions = build_instructions(profile, today=date(2026, 8, 21))
+
+        assert instructions.rstrip().endswith("ya terminó.")
+        assert instructions.index("ABBA Networks") < instructions.index("Fecha de hoy")
+
+    def test_instruye_no_asumir_vigencia(self, profile: Profile) -> None:
+        instructions = " ".join(build_instructions(profile).split())
+
+        assert "No asumas que un puesto sigue vigente" in instructions
+        assert "no es necesariamente el puesto actual" in instructions

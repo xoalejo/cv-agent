@@ -36,7 +36,7 @@ formación, en **español o inglés** según el idioma de quien pregunta, manten
 la continuidad del hilo de conversación.
 
 ```bash
-curl -X POST https://<tu-app>.fly.dev/responses \
+curl -X POST https://cv-agent-amber.vercel.app/responses \
   -H "Authorization: Bearer $AGENT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"input": "¿En qué empresas ha trabajado con RAG?"}'
@@ -92,7 +92,7 @@ Pruebas y evaluación:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                              # 117 pruebas, sin red
+pytest                                              # 122 pruebas, sin red
 python evals/run_evals.py --base-url http://localhost:8000
 ```
 
@@ -166,7 +166,7 @@ No por dogma. Se justifica por dos cosas medibles:
    OpenAI sustituible. Es la misma tesis que sostiene a Open Responses, desacoplar
    el agente del proveedor, aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
-   sin llamar a ningún servicio: **117 pruebas en ~1.3 s, sin gastar un token**.
+   sin llamar a ningún servicio: **122 pruebas en ~1.5 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
 ### 3. Por qué no se usó RAG con base vectorial
@@ -404,7 +404,7 @@ pruebas*.
 | Control | Implementación |
 |---|---|
 | **Autenticación** | Bearer obligatorio, comparación en **tiempo constante** (`hmac.compare_digest`) para no filtrar la clave por temporización |
-| **Secretos** | Solo por entorno / Fly secrets. `.env` en `.gitignore`, `.env.example` con placeholders |
+| **Secretos** | Solo por variables de entorno del hosting. `.env` en `.gitignore`, `.env.example` con placeholders |
 | **Validación** | Pydantic; estricta en lo propio, tolerante con campos extra del protocolo |
 | **CORS** | Cerrado por defecto. Es integración servidor-a-servidor, no un cliente de navegador. Nunca `*` |
 | **Errores** | El fallo del proveedor devuelve un 502 genérico; el detalle se queda en logs. *Verificado: un 401 de OpenAI con la clave enmascarada no llega al cliente* |
@@ -420,7 +420,7 @@ pruebas*.
 ### Pruebas unitarias e integración (sin red)
 
 ```bash
-pytest -q     # 117 pruebas en ~1.3 s
+pytest -q     # 122 pruebas en ~1.5 s
 ```
 
 Cubren las políticas de divulgación (incluidos los falsos positivos), la búsqueda
@@ -432,16 +432,16 @@ su seguridad. Ninguna llama a OpenAI: los puertos se sustituyen por dobles.
 
 ```bash
 python evals/run_evals.py --base-url http://localhost:8000
-python evals/run_evals.py --base-url https://<tu-app>.fly.dev   # gate final
+python evals/run_evals.py --base-url https://cv-agent-amber.vercel.app  # gate final
 python evals/run_evals.py --category pii --verbose
 python evals/run_evals.py --no-judge     # solo comprobaciones deterministas
 ```
 
-**24 casos dorados** en 8 categorías:
+**26 casos dorados** en 8 categorías:
 
 | Categoría | Qué verifica |
 |---|---|
-| `recall` | Datos correctos del CV: empresas, fechas, formación, patentes |
+| `recall` | Datos correctos del CV y vigencia real de cada puesto |
 | `grounding` | Preguntas transversales que ejercitan `search_profile` |
 | `honestidad` | Admite lo que no está en el CV, tiende puentes con evidencia y no promete desempeño futuro |
 | `pii` | El teléfono no aparece ni ante peticiones directas o insistentes |
@@ -468,27 +468,43 @@ El runner marca en rojo los fallos de `pii` e `injection` como bloqueantes.
 
 ## Despliegue
 
-```bash
-fly launch --no-deploy
-fly secrets set \
-  OPENAI_API_KEY="sk-..." \
-  AGENT_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-fly deploy
+En producción: **https://cv-agent-amber.vercel.app**
 
-curl https://<tu-app>.fly.dev/health
+```bash
+vercel link --yes --project cv-agent
+printf '%s' "sk-..." | vercel env add OPENAI_API_KEY production
+printf '%s' "$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
+  | vercel env add AGENT_API_KEY production
+vercel deploy --prod
+
+curl https://cv-agent-amber.vercel.app/health
 ```
 
-Una máquina siempre encendida (`min_machines_running = 1`): el agente se prueba de
-forma interactiva y un arranque en frío a mitad de una demostración se lee como un
-servicio caído. Región `qro` (Querétaro) por cercanía.
+`vercel.json` usa `routes` en lugar de `rewrites` a propósito: `rewrites`
+sustituye la ruta de la petición, de modo que la aplicación recibiría siempre
+`/api/index` y ninguna ruta coincidiría. `routes` conserva la ruta original.
+
+El caso de uso se construye en el `lifespan` al arrancar, pero también de forma
+diferida en la primera petición: en un entorno serverless ese ciclo no siempre se
+ejecuta, y sin esa reserva el endpoint respondería 503 estando bien configurado.
+
+**Protección de despliegue:** hay que dejar el alias de producción sin Vercel
+Authentication. Ese mecanismo exige un inicio de sesión de Vercel que un cliente
+de API no puede completar, y devolvería un 302 hacia `vercel.com/sso-api`. El
+control de acceso lo aporta la credencial Bearer del propio servicio.
 
 ### Operación
 
 ```bash
-fly logs                                    # métricas por turno, sin contenido
-fly secrets set AGENT_API_KEY="nueva"       # rotar credencial (redespliega solo)
-fly status
+vercel logs cv-agent                      # métricas por turno, sin contenido
+printf '%s' "nueva" | vercel env add AGENT_API_KEY production --force
+vercel deploy --prod                      # aplicar la rotación
+vercel inspect cv-agent-amber.vercel.app
 ```
+
+También se conserva un `Dockerfile` con la misma aplicación, verificado en CI
+(construye, arranca y responde `/health` sin privilegios de root). Sirve para
+ejecutarla en cualquier plataforma de contenedores sin cambios en el código.
 
 ---
 
@@ -498,7 +514,7 @@ En **Agentes → Añadir un agente**:
 
 | Campo | Valor |
 |---|---|
-| **URL base** | `https://<tu-app>.fly.dev` |
+| **URL base** | `https://cv-agent-amber.vercel.app` |
 | **Clave de API** | el valor de `AGENT_API_KEY` |
 | **Modelo** | *vacío*, lo decide el servidor ([decisión 6](#6-el-servidor-decide-el-modelo)) |
 | **Estado de la conversación** | Reproducir transcripción |
@@ -506,7 +522,7 @@ En **Agentes → Añadir un agente**:
 | **Entrada de imágenes / archivos** | desactivadas (fuera de alcance) |
 
 La plataforma concatena `/responses` a la URL base. El servicio también responde
-bajo `/v1`, así que registrar `https://<tu-app>.fly.dev/v1` funciona igual.
+bajo `/v1`, así que registrar `https://cv-agent-amber.vercel.app/v1` funciona igual.
 
 ---
 
@@ -560,8 +576,8 @@ src/
 │   └── security.py         # Auth y límite de tasa
 └── config.py
 
-tests/          # 117 pruebas, sin red
-evals/          # 24 casos dorados contra el endpoint real
+tests/          # 122 pruebas, sin red
+evals/          # 26 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```
 

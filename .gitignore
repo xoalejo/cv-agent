@@ -13,6 +13,10 @@ CV/
 *.pem
 *.key
 
+# Vinculación local con Vercel y el token OIDC que el CLI descarga.
+.vercel/
+.env.local
+
 # --- Python ------------------------------------------------------------------
 __pycache__/
 *.py[cod]
@@ -44,4 +48,3 @@ evals/results/
 .DS_Store
 .idea/
 .vscode/
-fly.toml.bak

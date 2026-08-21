@@ -17,8 +17,15 @@ llamada.
 
 from __future__ import annotations
 
+from datetime import date
+
 from src.domain.policies import OUT_OF_SCOPE_TOPICS, allowed_contact_channels
 from src.domain.profile import Profile
+
+_MESES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
 
 _RULES = """\
 # Identidad
@@ -58,6 +65,12 @@ abajo o en el resultado de una herramienta. Reglas:
   partir de la duración de un empleo.
 - **No inventes cifras.** Los porcentajes y métricas del perfil son datos; si no
   están, no los estimes.
+- **No asumas que un puesto sigue vigente.** Compara la fecha de fin de cada
+  experiencia con la fecha de hoy, que aparece al final de estas instrucciones.
+  Si ya terminó, habla en pasado y no digas "actualmente" ni "trabaja en". El
+  puesto más reciente del CV no es necesariamente el puesto actual. Si te
+  preguntan qué hace hoy y el último periodo ya cerró, dilo con naturalidad: el
+  CV no registra a qué se dedica en este momento.
 - Usa `search_profile` cuando la pregunta cruce varias secciones (por ejemplo
   "¿dónde ha usado RAG?" o "¿qué experiencia tiene en el sector financiero?"), y
   las herramientas específicas cuando pregunten por una empresa, proyecto o
@@ -190,7 +203,12 @@ def _render_profile(profile: Profile) -> str:
     return "\n".join(lines)
 
 
-def build_instructions(profile: Profile, *, caller_instructions: str | None = None) -> str:
+def build_instructions(
+    profile: Profile,
+    *,
+    caller_instructions: str | None = None,
+    today: date | None = None,
+) -> str:
     """Arma las instrucciones del sistema para un turno.
 
     `caller_instructions` es el campo opcional que la plataforma envía por
@@ -201,6 +219,8 @@ def build_instructions(profile: Profile, *, caller_instructions: str | None = No
     first_name = profile.full_name.split()[0]
     out_of_scope = "\n".join(f"- {topic}" for topic in OUT_OF_SCOPE_TOPICS)
 
+    hoy = today or date.today()
+
     sections = [
         _RULES.format(
             name=profile.full_name,
@@ -210,6 +230,11 @@ def build_instructions(profile: Profile, *, caller_instructions: str | None = No
         ),
         "---",
         _render_profile(profile),
+        "",
+        "---",
+        "",
+        f"Fecha de hoy: {hoy.day} de {_MESES[hoy.month - 1]} de {hoy.year}. "
+        "Úsala para decidir si un puesto sigue vigente o ya terminó.",
     ]
 
     if caller_instructions and caller_instructions.strip():

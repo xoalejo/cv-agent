@@ -1,0 +1,16 @@
+# Lo que no necesita el runtime. Reduce el tamaño del paquete y evita subir
+# material que no tiene por qué salir del entorno local.
+CV/
+*.pdf
+.env
+.venv/
+tests/
+evals/
+scripts/
+changelog/
+deploy/
+.github/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+Dockerfile
