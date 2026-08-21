@@ -523,3 +523,35 @@ class TestStreaming:
             assert eventos[-1]["type"] == "response.completed"
         finally:
             client.__exit__(None, None, None)
+
+
+class TestAgentCardDiscovery:
+    """Un documento de descubrimiento tiene que poder descubrirse."""
+
+    def test_responde_a_head(self, client: TestClient) -> None:
+        """Hay clientes que comprueban existencia antes de descargar."""
+        assert client.head("/.well-known/agent-card.json").status_code == 200
+
+    def test_responde_a_options(self, client: TestClient) -> None:
+        assert client.options("/.well-known/agent-card.json").status_code == 200
+
+    def test_permite_lectura_desde_navegador(self, client: TestClient) -> None:
+        """Sin CORS, un cliente web no puede leer la tarjeta."""
+        r = client.get("/.well-known/agent-card.json")
+
+        assert r.headers["access-control-allow-origin"] == "*"
+
+    def test_el_endpoint_de_conversacion_no_abre_cors(self, client: TestClient) -> None:
+        """La apertura es solo para la tarjeta, no para el resto del servicio."""
+        r = client.post(
+            "/responses",
+            json={"input": "hola"},
+            headers={**AUTH, "Origin": "https://sitio-cualquiera.com"},
+        )
+
+        assert "access-control-allow-origin" not in r.headers
+
+    def test_se_sirve_como_json(self, client: TestClient) -> None:
+        r = client.get("/.well-known/agent-card.json")
+
+        assert r.headers["content-type"].startswith("application/json")

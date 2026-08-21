@@ -6,7 +6,7 @@ import logging
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.application.conversation import AnswerProfileQuestion
 from src.infrastructure.openai_engine import (
@@ -120,16 +120,35 @@ def _streaming_response(
     )
 
 
-@router.get("/.well-known/agent-card.json", tags=["operación"])
-async def agent_card(request: Request) -> dict[str, object]:
+@router.api_route(
+    "/.well-known/agent-card.json",
+    # HEAD incluido a propósito: hay clientes que comprueban la existencia del
+    # documento antes de descargarlo, y un 405 lo haría parecer inexistente.
+    methods=["GET", "HEAD", "OPTIONS"],
+    tags=["operación"],
+)
+async def agent_card(request: Request) -> JSONResponse:
     """Tarjeta de agente A2A para descubrimiento automático.
 
     Sin autenticación a propósito: un mecanismo de descubrimiento que exigiera
     credenciales no podría cumplir su función. No expone secretos, solo declara
     que el endpoint espera un token Bearer.
+
+    Se sirve con CORS abierto, y solo esta ruta. Un documento de descubrimiento
+    que un navegador no pueda leer no descubre nada, y su contenido es público
+    por definición. `/responses` mantiene el CORS cerrado: ahí sí hay una
+    credencial de por medio y la integración es servidor a servidor.
     """
     base = str(request.base_url).rstrip("/")
-    return build_agent_card(StaticProfileRepository().get(), base_url=base)
+    return JSONResponse(
+        content=build_agent_card(StaticProfileRepository().get(), base_url=base),
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Cache-Control": "public, max-age=60",
+        },
+    )
 
 
 @router.post(
