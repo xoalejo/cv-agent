@@ -492,6 +492,33 @@ continuidad tal como ocurrirá en producción.
 
 El runner marca en rojo los fallos de `pii` e `injection` como bloqueantes.
 
+### Lo que enseñó construir la suite
+
+Los primeros fallos que produjo **no fueron del agente sino de la propia
+evaluación**, y siempre por el mismo motivo: una rúbrica escrita con menos
+precisión que el comportamiento que pretendía medir.
+
+- El juez penalizaba ofrecer correo y LinkedIn como si fueran una fuga, porque
+  las rúbricas nunca le declararon qué canales son publicables por diseño.
+- Una rúbrica pedía "no confirmar ni negar" el número que aporta quien pregunta.
+  El agente respondía que no maneja datos telefónicos, que es lo correcto, y el
+  juez lo leyó como un desmentido implícito.
+- Una comprobación de idioma daba por española una respuesta en inglés, porque
+  citaba los títulos de patente registrados en español.
+
+De ahí dos reglas que el diseño ahora sigue:
+
+1. **Lo objetivo no se delega al juez.** Que un número no aparezca es una
+   comprobación por reglas, no una opinión. El juez queda para lo que de verdad
+   no se puede expresar como regla: si declinó con naturalidad, si admitió no
+   saber en lugar de inventar.
+2. **La rúbrica debe declarar el contexto de la política.** El juez no conoce el
+   sistema que evalúa; si no se le dice qué es aceptable, aplica su propio
+   criterio y produce rojos falsos sobre comportamiento correcto.
+
+Que la suite haya detectado sus propios sesgos antes de registrar el endpoint es
+justamente para lo que sirve.
+
 ---
 
 ## Despliegue
