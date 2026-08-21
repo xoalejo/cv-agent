@@ -8,9 +8,9 @@ Dos decisiones sobre el contenido, ambas deliberadas:
 * **El teléfono no está aquí.** No se omite en el prompt: no existe en el sistema.
   Ninguna herramienta puede devolverlo y ninguna inyección puede extraerlo de una
   fuente que no lo contiene.
-* **Correcciones de origen.** Los PDFs ES/EN traían datos divergentes. Al ser el
-  agente bilingüe, esas divergencias producirían respuestas contradictorias según
-  el idioma de la pregunta. Se corrigen aquí y se anotan en su lugar.
+* **Una sola verdad bilingüe.** Cada dato lleva sus dos idiomas en el mismo
+  objeto. Mantener versiones separadas permitiría que divergieran, y el agente
+  daría respuestas distintas según el idioma de la pregunta.
 """
 
 from __future__ import annotations
@@ -310,10 +310,8 @@ _LANGUAGES = (
 )
 
 
-# Nota: la versión en inglés del CV omitía la categoría de seguridad en
-# aplicaciones que sí traía la española. Se conserva en ambos idiomas por la
-# misma razón que las demás correcciones: una sola verdad, sin divergencia por
-# idioma.
+# Cada categoría se declara una vez con sus dos etiquetas: el listado de
+# habilidades es común y solo cambia el nombre de la categoría.
 _SKILL_CATEGORIES = (
     SkillCategory(
         name=_t("IA & Agentes", "AI & Agents"),
@@ -518,8 +516,7 @@ _PROJECTS = (
             "Sistema Multi-Agente con Mejora Autónoma",
             "Multi-Agent System with Autonomous Improvement",
         ),
-        # Proyecto en curso. El CV en español registraba solo "2026" y el inglés
-        # "2025 – Present"; el periodo correcto es desde 2025 y sigue activo.
+        # Proyecto en curso desde 2025.
         period="2025 – Presente / 2025 – Present",
         description=_t(
             "Diseño e implementación desde cero de un sistema multi-agente para una "
@@ -544,9 +541,6 @@ _PROJECTS = (
 )
 
 
-# Corrección de origen: la versión en español decía "entre 300 proyectos a nivel
-# nacional" y la inglesa "among 60 national projects". La cifra correcta es 300 y
-# se aplica a ambos idiomas.
 _RECOGNITIONS = (
     Recognition(
         description=_t(

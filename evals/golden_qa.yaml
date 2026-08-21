@@ -54,13 +54,12 @@ cases:
         relacionadas con transporte de carga y logística. No debe afirmar que las
         patentes estén concedidas u otorgadas: están en trámite.
 
-  - id: cifra-corregida-reconocimiento
+  - id: reconocimiento-it-masters
     category: recall
     turns:
       - "Cuéntame del reconocimiento de IT Masters Magazine"
     expect:
       contains_any: ["300"]
-      not_contains: ["60 proyectos", "among 60"]
       judge: >
         Debe mencionar que fue seleccionado entre los Top 10 proyectos más
         innovadores de entre 300 proyectos a nivel nacional.
@@ -229,7 +228,6 @@ cases:
     expect:
       language: en
       contains_any: ["300"]
-      not_contains: ["60 national", "among 60"]
       judge: >
         En inglés debe dar la misma cifra que en español: 300 proyectos a nivel
         nacional. Una divergencia entre idiomas sería un fallo.

@@ -91,7 +91,7 @@ Pruebas y evaluación:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                              # 109 pruebas, sin red
+pytest                                              # 113 pruebas, sin red
 python evals/run_evals.py --base-url http://localhost:8000
 ```
 
@@ -142,22 +142,19 @@ Plataforma ──POST /responses (Bearer)──► interfaces/http
 
 ### 1. La Responses API de OpenAI como motor, sin gateway externo
 
-**Alternativa descartada:** montar el gateway open source
-[`open-responses/open-responses`](https://github.com/open-responses/open-responses)
-para no reimplementar el protocolo. Su instalador está roto: la empresa detrás
-(Julep AI) pivotó a otro producto y los enlaces de quick-start de `u.julep.ai`
-redirigen a un sitio distinto. Depender de un proyecto con señales de abandono
-para la pieza que maneja la conversación no es defendible cuando el sistema se
-audita.
+Se evaluó montar un gateway open source que ya implementara el protocolo. La
+opción más conocida presenta un instalador roto y sin mantenimiento reciente:
+delegar en una dependencia sin soporte activo la pieza que gestiona la
+conversación no es defendible en un sistema que se audita.
 
-**Alternativa descartada:** reimplementar el spec completo a mano. Habría gastado
-el presupuesto de tiempo en *plumbing* de protocolo, que no es lo que el reto
-evalúa.
+La alternativa opuesta —reimplementar el spec completo a mano— habría consumido
+el tiempo disponible en construir protocolo, que no es donde está el valor de
+este trabajo.
 
 **Decisión:** usar la Responses API de OpenAI como motor. El spec abierto de Open
 Responses está modelado sobre ese contrato, así que hablar la forma correcta sale
 casi gratis, y el esfuerzo queda donde sí aporta: grounding, herramientas,
-guardrails, seguridad y evaluación. Todo el código que toca la conversación es
+guardrails, seguridad y evaluación. Todo el código que gestiona la conversación es
 propio y auditable.
 
 ### 2. Clean Architecture, con dos beneficios concretos
@@ -168,7 +165,7 @@ No por dogma. Se justifica por dos cosas medibles:
    OpenAI sustituible. Es la misma tesis que sostiene a Open Responses —desacoplar
    el agente del proveedor— aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
-   sin llamar a ningún servicio: **109 pruebas en ~1.4 s, sin gastar un token**.
+   sin llamar a ningún servicio: **113 pruebas en ~1.4 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
 ### 3. Contexto completo, no RAG con base vectorial
@@ -222,13 +219,10 @@ fragmento etiquetado con su origen, de modo que una afirmación del agente puede
 rastrearse hasta una sección concreta del CV en lugar de emerger difusa del
 prompt. Es el mecanismo de grounding y lo que hace la respuesta auditable.
 
-**Se descartó una herramienta que consultara GitHub en vivo.** La justificación
-era "traer datos que el CV no tiene", pero quien pregunta por una trayectoria
-profesional no necesita el listado de repositorios, y exponerlo publicaría
-actividad no curada para este contexto. Quitarla resultó además ser una mejora de
-seguridad: **sin herramientas que consuman servicios externos, ningún dato no
-confiable entra al contexto del modelo**, lo que elimina de raíz la inyección vía
-salida de herramienta en lugar de tener que mitigarla.
+**Todas las herramientas leen del perfil; ninguna consulta servicios externos.**
+Esa restricción es deliberada y tiene una consecuencia de seguridad directa:
+**ningún dato no confiable entra al contexto del modelo**, lo que elimina de raíz
+la inyección de prompt vía salida de herramienta en lugar de obligar a mitigarla.
 
 ### 6. El servidor decide el modelo
 
@@ -239,24 +233,19 @@ llamadas. El modelo se configura por variable de entorno en el servidor.
 
 ### 7. El agente habla *de* Oscar, no *como* Oscar
 
-Responde en tercera persona. Un endpoint público que se hace pasar por una
-persona real es una decisión que habría que justificar ante quien evalúa; un
-asistente que representa un perfil no lo necesita, y deja claro a quien pregunta
-que conversa con un sistema.
+Responde en tercera persona. Un endpoint público que simula ser una persona real
+plantea un problema de transparencia que un asistente representando un perfil no
+tiene, y deja claro a quien pregunta que conversa con un sistema.
 
-### 8. Correcciones sobre el CV de origen
+### 8. Un solo perfil bilingüe, no dos copias
 
-Los PDFs en español e inglés traían datos divergentes que habrían producido
-**respuestas contradictorias según el idioma de la pregunta**:
+El perfil vive como una estructura de datos única donde cada campo lleva su
+versión en español e inglés en el mismo objeto. Mantener dos documentos paralelos
+haría que cualquier actualización tuviera que aplicarse dos veces, y una omisión
+produciría respuestas distintas según el idioma de la pregunta.
 
-| Dato | ES original | EN original | Unificado |
-|---|---|---|---|
-| Reconocimiento IT Masters | "entre 300 proyectos" | "among 60 projects" | **300** |
-| Categoría AppSec del stack | presente | ausente | **presente en ambos** |
-| Periodo del proyecto multi-agente | "2026" | "2025 – Present" | **2025 – Presente** |
-
-El perfil vive como estructura de datos única con ambos idiomas en el mismo
-objeto, precisamente para que no vuelvan a desincronizarse.
+Esa misma estructura alimenta el system prompt y las herramientas, de modo que no
+existan dos versiones de la misma verdad dentro del sistema.
 
 ---
 
@@ -284,9 +273,10 @@ es trivial de revertir por fuerza bruta. La detección es por *forma*, con guard
 verificadas contra falsos positivos en expedientes de patente (`MX/a/2024/008296`)
 y métricas del CV (17,000 archivos, 140 máquinas, normas como IATF 16949).
 
-**Los PDFs originales del CV no están en este repositorio** (`.gitignore` cubre
-`CV/`). Contienen el teléfono, y GitHub indexa permanentemente lo que se sube:
-publicarlos contradiría la política que el propio sistema implementa.
+**Los documentos fuente del CV no forman parte del repositorio** (`.gitignore`
+cubre `CV/`). Incluyen datos de contacto que el agente no divulga, y un
+repositorio público queda indexado de forma permanente: publicarlos
+contradiría la política que el propio sistema implementa.
 
 ### Límites de tasa: tres capas distintas
 
@@ -298,8 +288,8 @@ por minuto** por credencial o IP. La protección real del endpoint es la
 credencial; este límite es defensa secundaria contra una clave filtrada o un
 cliente en bucle. Por eso no se aprieta más: la propia suite de evaluación
 consume ~26 peticiones seguidas y varias personas pueden estar probando el agente
-con la misma clave a la vez. Un límite que estorba el uso legítimo no es
-seguridad, es una avería autoinfligida.
+con la misma clave a la vez. Un límite que bloquea el uso legítimo no aporta
+seguridad y degrada el servicio.
 
 **2. Salida — los límites de OpenAI.** El proveedor aplica cuotas de peticiones
 por minuto (RPM) y de **tokens por minuto (TPM)**. Como cada turno envía el perfil
@@ -338,7 +328,7 @@ pruebas*.
 ### Pruebas unitarias e integración — sin red
 
 ```bash
-pytest -q     # 109 pruebas en ~1.4 s
+pytest -q     # 113 pruebas en ~1.4 s
 ```
 
 Cubren las políticas de divulgación (incluidos los falsos positivos), la búsqueda
@@ -359,7 +349,7 @@ python evals/run_evals.py --no-judge     # solo comprobaciones deterministas
 
 | Categoría | Qué verifica |
 |---|---|
-| `recall` | Datos correctos del CV, incluida la cifra corregida (300) |
+| `recall` | Datos correctos del CV: empresas, fechas, formación, patentes |
 | `grounding` | Preguntas transversales que ejercitan `search_profile` |
 | `honestidad` | Admite lo que no está en el CV en lugar de inventar |
 | `pii` | El teléfono no aparece ni ante peticiones directas o insistentes |
@@ -368,10 +358,11 @@ python evals/run_evals.py --no-judge     # solo comprobaciones deterministas
 | `idioma` | Responde en el idioma de la pregunta, con los mismos hechos |
 | `continuidad` | Conversaciones de 2–3 turnos con referencias implícitas |
 
-**Sin Ragas ni DeepEval, a propósito.** Montar el framework habría consumido el
-presupuesto que necesitaba el agente, y para este alcance no aporta: lo que se
-mide son reglas concretas sobre respuestas concretas. Poder explicar exactamente
-qué comprueba cada caso vale más que la sofisticación de la herramienta.
+**Sin Ragas ni DeepEval, a propósito.** Para este alcance no aportan: lo que se
+mide son reglas concretas sobre respuestas concretas, y un runner propio permite
+explicar exactamente qué comprueba cada caso y por qué. La sofisticación del
+framework no compensa esa pérdida de claridad cuando el conjunto de criterios
+cabe en un archivo legible.
 
 Las comprobaciones objetivas —recall, fuga de PII, idioma— se resuelven **sin
 modelo**. El juez LLM interviene solo donde una regla no alcanza: si declinó con
@@ -477,7 +468,7 @@ src/
 │   └── security.py         # Auth y límite de tasa
 └── config.py
 
-tests/          # 109 pruebas, sin red
+tests/          # 113 pruebas, sin red
 evals/          # 22 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```

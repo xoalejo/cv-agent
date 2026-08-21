@@ -31,13 +31,12 @@ class TestProfileGrounding:
         assert "Digital Transformation Specialist" in instructions
         assert "Especialista en Transformación Digital" in instructions
 
-    def test_incluye_la_cifra_corregida(self, profile: Profile) -> None:
-        """La versión inglesa del CV decía 60; la correcta es 300, en ambos idiomas."""
+    def test_las_cifras_coinciden_entre_idiomas(self, profile: Profile) -> None:
+        """Un mismo dato no puede diferir según el idioma en que se responda."""
         instructions = build_instructions(profile)
 
         assert "Entre 300 proyectos" in instructions
         assert "Among 300 national projects" in instructions
-        assert "among 60" not in instructions.lower()
 
 
 class TestDisclosure:

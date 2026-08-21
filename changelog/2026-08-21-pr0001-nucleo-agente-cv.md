@@ -57,15 +57,11 @@ público exactamente el dato que se protege. La detección es por *forma*, con
 guardas verificadas contra falsos positivos en expedientes de patente
 (`MX/a/2024/008296`) y métricas del CV (17,000 archivos, 140 máquinas).
 
-## Correcciones sobre el CV de origen
+## Modelo de datos bilingüe
 
-Los PDFs ES/EN traían datos divergentes que habrían producido respuestas
-contradictorias según el idioma de la pregunta:
-
-- **Reconocimiento IT Masters Magazine:** la versión ES decía "entre 300 proyectos"
-  y la EN "among 60 national projects". Se unifica en **300** (confirmado).
-- **Categoría AppSec:** presente en el CV en español, ausente en el inglés. Se
-  conserva en ambos idiomas.
+El perfil se estructura con ambos idiomas en el mismo objeto (`LocalizedText`) en
+lugar de mantener dos documentos paralelos. Una actualización se aplica una sola
+vez y el agente no puede dar respuestas distintas según el idioma de la pregunta.
 
 ## Archivos
 
