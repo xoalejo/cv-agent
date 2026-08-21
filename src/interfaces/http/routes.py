@@ -87,8 +87,7 @@ async def create_response(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=(
-                "El proveedor del modelo alcanzó su límite de uso. "
-                "Reintenta en unos segundos."
+                "El proveedor del modelo alcanzó su límite de uso. Reintenta en unos segundos."
             ),
             headers={"Retry-After": str(exc.retry_after)},
         ) from None

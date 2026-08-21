@@ -63,9 +63,7 @@ class TestExecution:
         self, tools: ToolRegistry
     ) -> None:
         """El CV es la fuente canónica; traducir es tarea del modelo al responder."""
-        result = tools.execute("get_experience", json.dumps({"company": "arbomex"}))[
-            "result"
-        ]
+        result = tools.execute("get_experience", json.dumps({"company": "arbomex"}))["result"]
         assert result["role"] == "Ingeniero de Proyectos en Automatización"
 
     def test_ningun_parametro_de_idioma_en_las_definiciones(self) -> None:
@@ -117,9 +115,9 @@ class TestExecution:
             assert match["source"]
 
     def test_busqueda_sin_coincidencias_lo_dice(self, tools: ToolRegistry) -> None:
-        result = tools.execute(
-            "search_profile", json.dumps({"query": "repostería francesa"})
-        )["result"]
+        result = tools.execute("search_profile", json.dumps({"query": "repostería francesa"}))[
+            "result"
+        ]
 
         assert result["matches"] == []
         assert "no cubre" in result["note"].lower()
@@ -133,9 +131,7 @@ class TestContactPolicy:
         assert kinds == {"email", "linkedin", "github"}
         assert "phone" not in kinds
 
-    def test_ninguna_herramienta_puede_devolver_un_telefono(
-        self, tools: ToolRegistry
-    ) -> None:
+    def test_ninguna_herramienta_puede_devolver_un_telefono(self, tools: ToolRegistry) -> None:
         """Barrido sobre todas las herramientas: el dato no existe en el sistema."""
         from src.domain.policies import contains_contact_data
 
@@ -167,9 +163,7 @@ class TestErrorHandling:
         result = tools.execute("get_experience", "[1, 2, 3]")
         assert "error" in result
 
-    def test_argumentos_vacios_equivalen_a_sin_argumentos(
-        self, tools: ToolRegistry
-    ) -> None:
+    def test_argumentos_vacios_equivalen_a_sin_argumentos(self, tools: ToolRegistry) -> None:
         assert "result" in tools.execute("get_certifications", "")
 
     def test_toda_salida_es_serializable(self, tools: ToolRegistry) -> None:

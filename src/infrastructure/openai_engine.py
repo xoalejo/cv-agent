@@ -11,8 +11,8 @@ es la que habilita `previous_response_id`. Aquí el hilo se reconstruye enviando
 conversaciones almacenadas fuera del proceso.
 
 Sobre los límites del proveedor: OpenAI aplica cuotas por minuto de peticiones
-(RPM) y de tokens (TPM). Como cada turno envía el perfil completo —del orden de
-4-5k tokens de entrada—, **el límite que se alcanza primero es el de tokens, no
+(RPM) y de tokens (TPM). Como cada turno envía el perfil completo (del orden de
+4-5k tokens de entrada), **el límite que se alcanza primero es el de tokens, no
 el de peticiones**. Un 429 del proveedor es transitorio y debe distinguirse de un
 fallo real: se traduce en `LLMRateLimitError` para que la capa HTTP responda 429
 con `Retry-After` en lugar de presentar un límite pasajero como avería.
@@ -107,6 +107,7 @@ class OpenAIResponsesEngine:
         model: str,
         timeout: float = 60.0,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        reasoning_effort: str = "low",
     ) -> None:
         if not api_key:
             raise ValueError("Falta OPENAI_API_KEY: el motor no puede inicializarse.")
@@ -115,6 +116,7 @@ class OpenAIResponsesEngine:
         # por defecto: es una decisión de disponibilidad, no un detalle oculto.
         self._client = OpenAI(api_key=api_key, timeout=timeout, max_retries=max_retries)
         self._model = model
+        self._reasoning_effort = reasoning_effort
 
     @property
     def model(self) -> str:
@@ -134,6 +136,7 @@ class OpenAIResponsesEngine:
                 input=input_items,
                 tools=tools,
                 store=False,
+                reasoning={"effort": self._reasoning_effort},
             )
         except RateLimitError as exc:
             # Llega aquí solo si los reintentos del SDK ya se agotaron: la cuota

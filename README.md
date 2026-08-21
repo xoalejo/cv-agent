@@ -1,11 +1,12 @@
-# CV Agent — Agente conversacional de trayectoria profesional
+# CV Agent
 
 [![CI](https://github.com/xoalejo/cv-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/xoalejo/cv-agent/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Agente que conversa sobre el perfil profesional de **Oscar Alejo**, expuesto como
-endpoint HTTP compatible con el contrato **[Open Responses](https://www.openresponses.org/)**.
+Agente conversacional sobre la trayectoria profesional de **Oscar Alejo**,
+expuesto como endpoint HTTP compatible con el contrato
+**[Open Responses](https://www.openresponses.org/)**.
 
 Construido para el **Reto IA Banorte**. Este documento explica no solo cómo
 funciona, sino **por qué está construido así**: cada decisión relevante viene con
@@ -147,7 +148,7 @@ opción más conocida presenta un instalador roto y sin mantenimiento reciente:
 delegar en una dependencia sin soporte activo la pieza que gestiona la
 conversación no es defendible en un sistema que se audita.
 
-La alternativa opuesta —reimplementar el spec completo a mano— habría consumido
+La alternativa opuesta, reimplementar el spec completo a mano, habría consumido
 el tiempo disponible en construir protocolo, que no es donde está el valor de
 este trabajo.
 
@@ -162,26 +163,46 @@ propio y auditable.
 No por dogma. Se justifica por dos cosas medibles:
 
 1. **Independencia de proveedor.** El puerto `LLMEngine` deja el adaptador de
-   OpenAI sustituible. Es la misma tesis que sostiene a Open Responses —desacoplar
-   el agente del proveedor— aplicada al código propio.
+   OpenAI sustituible. Es la misma tesis que sostiene a Open Responses, desacoplar
+   el agente del proveedor, aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
    sin llamar a ningún servicio: **117 pruebas en ~1.3 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
-### 3. Contexto completo, no RAG con base vectorial
+### 3. Por qué no se usó RAG con base vectorial
 
-El perfil son ~1,500 palabras: **cabe entero en el contexto**. Un
-pipeline de RAG con embeddings y base vectorial sobre un corpus de ese tamaño
-añade un servicio que operar, una dependencia que mantener y latencia por
-consulta, sin mejorar el recall de forma medible. Habría sido acumular tecnología
-sin una razón clara.
+La opción evidente para un agente sobre documentos es RAG: fragmentar, generar
+embeddings, indexar en una base vectorial y recuperar por similitud. Se descartó,
+y conviene explicar el razonamiento porque la decisión es contraintuitiva.
 
-Para la búsqueda transversal se usa un **índice léxico en memoria**: normalización
-sin acentos y coincidencia por términos, con los prefijos anclados a inicio de
-palabra para no arrastrar falsos positivos. Queda detrás
-del puerto `ProfileSearch`, así que sustituirlo por embeddings el día que el
-corpus crezca no toca el caso de uso: la decisión está argumentada *y* es
-reversible.
+**El corpus no lo justifica.** El perfil completo son unas 1,500 palabras, cerca
+de 3,700 tokens. Cabe entero en el contexto de cualquier modelo actual, con
+holgura: la familia usada admite un millón de tokens. RAG resuelve el problema de
+*no poder mostrarle todo al modelo*, y aquí ese problema no existe.
+
+**Fragmentar tendría un costo real.** Un CV está lleno de dependencias entre
+secciones: un logro se entiende por la empresa y el periodo en que ocurrió, y el
+stack técnico solo cobra sentido junto a los proyectos que lo respaldan. Trocear
+el documento rompe esas relaciones, y luego hay que reconstruirlas con solapamiento
+entre fragmentos y metadatos. Se introduce un problema para después mitigarlo.
+
+**Lo que se pagaría a cambio.** Un servicio más que desplegar y respaldar, una
+dependencia más que mantener, una llamada de red por consulta que se suma a la
+latencia, y un modo de fallo nuevo: el retrieval devuelve el fragmento equivocado
+y el modelo responde con seguridad sobre material incorrecto. Todo eso sin mejorar
+de forma medible el recall sobre un texto que ya cabe completo.
+
+**Qué se hizo en su lugar.** El perfil viaja íntegro en el contexto, y para las
+preguntas transversales hay un índice léxico en memoria: normalización sin
+acentos, coincidencia por términos y prefijos anclados a inicio de palabra. Cero
+infraestructura, latencia nula, resultados deterministas y verificables en las
+pruebas.
+
+**Cuándo cambiaría la decisión.** Si el corpus creciera hasta no caber en
+contexto, por ejemplo incorporando artículos, documentación de proyectos o
+transcripciones. Por eso la búsqueda vive detrás del puerto `ProfileSearch`:
+sustituir el índice léxico por uno vectorial es escribir un adaptador nuevo, sin
+tocar el caso de uso. La decisión está argumentada **y** es reversible.
 
 ### 4. `store=False`: memoria del hilo sin datos en reposo
 
@@ -203,7 +224,7 @@ esquema de sesiones.
 El ciclo de herramientas también es stateless: los ítems `function_call` y
 `function_call_output` se acumulan en el array de `input` local y se reenvían.
 
-### 5. Herramientas que aportan trazabilidad
+### 5. Herramientas: alcance real y alcance demostrativo
 
 | Herramienta | Aporte |
 |---|---|
@@ -215,36 +236,92 @@ El ciclo de herramientas también es stateless: los ítems `function_call` y
 | `get_tech_stack(category?)` | stack por categoría |
 | `get_contact_info()` | canales de contacto permitidos |
 
-**`search_profile` es la que carga el peso arquitectónico.** Devuelve cada
-fragmento etiquetado con su origen, de modo que una afirmación del agente puede
-rastrearse hasta una sección concreta del CV en lugar de emerger difusa del
-prompt. Es el mecanismo de grounding y lo que hace la respuesta auditable.
+Conviene ser explícito sobre esto, porque de otro modo un lector técnico lo
+detectaría solo: **con el perfil completo ya en el contexto, la mayoría de estas
+herramientas son parcialmente redundantes**. El modelo puede responder qué
+certificaciones tiene sin llamar a `get_certifications`, porque el dato ya está
+delante de él.
+
+Se mantienen por dos razones distintas, y vale la pena separarlas:
+
+**Razón funcional.** `search_profile` sí aporta algo que el contexto plano no da:
+**trazabilidad**. Devuelve cada fragmento etiquetado con su origen, de modo que una
+afirmación del agente puede rastrearse hasta una sección concreta del CV en lugar
+de emerger difusa del prompt. Es el mecanismo de grounding y lo que hace la
+respuesta auditable. Las herramientas por sección, además, dan acceso estructurado
+y dirigido cuando la pregunta apunta a una empresa o categoría concreta.
+
+**Razón demostrativa, declarada como tal.** El resto del conjunto ejercita el
+ciclo completo de function calling: definición de esquemas, despacho, validación
+de argumentos, reinyección de resultados en el contexto y guarda de terminación.
+En un corpus de este tamaño no era estrictamente necesario, y se incluye para
+mostrar ese mecanismo funcionando de extremo a extremo. Preferimos declararlo
+antes que presentar como necesidad lo que es demostración.
+
+La arquitectura que lo sostiene sí es la que se usaría con un corpus mayor: el
+registro de herramientas, el ciclo de ejecución y los puertos no cambiarían si el
+perfil creciera diez veces.
 
 **Todas las herramientas leen del perfil; ninguna consulta servicios externos.**
 Esa restricción es deliberada y tiene una consecuencia de seguridad directa:
 **ningún dato no confiable entra al contexto del modelo**, lo que elimina de raíz
 la inyección de prompt vía salida de herramienta en lugar de obligar a mitigarla.
 
-### 6. El servidor decide el modelo
+### 6. Ante lo que el CV no cubre: reconocer y tender un puente
+
+La respuesta obvia a "¿sabe Rust?" cuando no aparece en el CV es "no lo sé". Es
+honesta, pero desaprovecha lo que el perfil sí demuestra.
+
+El agente reconoce el límite primero, sin rodeos, y después tiende un puente
+**apoyado en evidencia del propio perfil**: la tecnología más cercana que sí
+consta, un proyecto con el mismo tipo de problema, o el patrón de haber construido
+desde cero en organizaciones donde el problema aún no estaba definido.
+
+La distinción que sostiene el diseño es entre **patrón demostrado y promesa**:
+
+| Válido | Inválido |
+|---|---|
+| "No aparece Rust en su CV; sí ha incorporado stacks nuevos en cada etapa, como cuando montó los pipelines RAG en GCP" | "Aprendería Rust rápido" |
+
+Lo primero cita hechos del perfil. Lo segundo es una predicción sobre desempeño
+futuro que no consta en ninguna parte, y por tanto es una alucinación con formato
+de argumento de venta. El prompt prohíbe explícitamente prometer plazos, resultados
+o desempeño, y los casos de la categoría `honestidad` verifican que la frontera se
+respete.
+
+### 7. `reasoning.effort` en lugar de `temperature`
+
+**Esta familia de modelos no admite `temperature`**: la API rechaza cualquier valor
+distinto del predeterminado. Es un detalle que conviene conocer, porque el
+formulario de registro sugiere `{"temperature": 0.7}` como parámetro extra de
+ejemplo; reenviarlo tal cual haría fallar la llamada con un 400. Es otra razón por
+la que el servicio ignora los parámetros extra en lugar de propagarlos.
+
+El control equivalente es `reasoning.effort`, configurable por entorno y fijado en
+`low`. La tarea consiste en responder con datos que ya están en el contexto, no en
+resolver un problema: subir el esfuerzo añade latencia y costo sin mejorar
+respuestas que no requieren deliberación.
+
+### 8. El servidor decide el modelo
 
 La plataforma ofrece un campo "Modelo" opcional que viaja como `model` en el
 cuerpo de la petición. **Se ignora deliberadamente.** Aceptarlo dejaría que un
 tercero forzara un modelo caro o inexistente contra la cuenta que paga las
 llamadas. El modelo se configura por variable de entorno en el servidor.
 
-### 7. El agente habla *de* Oscar, no *como* Oscar
+### 9. El agente habla *de* Oscar, no *como* Oscar
 
 Responde en tercera persona. Un endpoint público que simula ser una persona real
 plantea un problema de transparencia que un asistente representando un perfil no
 tiene, y deja claro a quien pregunta que conversa con un sistema.
 
-### 8. Un solo idioma canónico, traducción en el momento
+### 10. Un solo idioma canónico, traducción en el momento
 
 El perfil se almacena **solo en español**, el idioma original del CV. Cuando la
 pregunta llega en inglés, el agente traduce al responder en lugar de leer de una
 segunda copia del contenido.
 
-La alternativa —mantener ambas versiones en los datos— obliga a aplicar cada
+La alternativa, mantener ambas versiones en los datos, obliga a aplicar cada
 actualización dos veces, y una omisión produce respuestas distintas según el
 idioma en que se pregunte. Con una sola versión esa clase de error no existe.
 
@@ -279,7 +356,7 @@ al modelo, sino como una propiedad del sistema:
    que no lo contiene.
 2. **La regla vive en el dominio** (`ALLOWED_CONTACT_KINDS`), no suelta en un
    prompt. El prompt la refuerza, pero no es la única línea de defensa.
-3. **Un guarda revisa la salida final** por si el número entró por otra vía —por
+3. **Un guarda revisa la salida final** por si el número entró por otra vía: por
    ejemplo, alguien que ya tiene el CV lo pega en el chat y pide confirmarlo.
 
 El número **tampoco se codifica en el detector**: hacerlo publicaría en un
@@ -298,7 +375,7 @@ contradiría la política que el propio sistema implementa.
 Un agente que llama a una API de pago tiene tres frentes de límite, y confundirlos
 lleva a presentar un problema transitorio como una avería.
 
-**1. Entrada — quién nos llama.** Ventana deslizante en memoria, **60 peticiones
+**1. Entrada, quién nos llama.** Ventana deslizante en memoria, **60 peticiones
 por minuto** por credencial o IP. La protección real del endpoint es la
 credencial; este límite es defensa secundaria contra una clave filtrada o un
 cliente en bucle. Por eso no se aprieta más: la propia suite de evaluación
@@ -306,9 +383,9 @@ consume ~26 peticiones seguidas y varias personas pueden estar probando el agent
 con la misma clave a la vez. Un límite que bloquea el uso legítimo no aporta
 seguridad y degrada el servicio.
 
-**2. Salida — los límites de OpenAI.** El proveedor aplica cuotas de peticiones
+**2. Salida, los límites de OpenAI.** El proveedor aplica cuotas de peticiones
 por minuto (RPM) y de **tokens por minuto (TPM)**. Como cada turno envía el perfil
-completo —del orden de 4-5k tokens de entrada—, **el límite que se alcanza primero
+completo (del orden de 4-5k tokens de entrada), **el límite que se alcanza primero
 es el de tokens, no el de peticiones**. El SDK reintenta con espera exponencial
 (`max_retries=3`) y absorbe los picos breves; si la cuota está saturada de verdad,
 el error se traduce en **HTTP 429 con `Retry-After`**, no en un 502. La distinción
@@ -319,7 +396,7 @@ devuelven **503**, no 429 ni 502: reintentar no lo arregla, hay que corregir la
 configuración. Tres causas distintas, tres códigos distintos.
 
 En los tres casos el detalle se queda en los logs. Un 429 de OpenAI que menciona
-la organización y los TPM de la cuenta nunca llega al cliente — *verificado con
+la organización y los TPM de la cuenta nunca llega al cliente. *Verificado con
 pruebas*.
 
 ### Otros controles
@@ -340,7 +417,7 @@ pruebas*.
 
 ## Verificación
 
-### Pruebas unitarias e integración — sin red
+### Pruebas unitarias e integración (sin red)
 
 ```bash
 pytest -q     # 117 pruebas en ~1.3 s
@@ -351,7 +428,7 @@ con procedencia, el registro de herramientas, el ciclo completo de conversación
 con la guarda de iteraciones, la construcción del prompt y el contrato HTTP con
 su seguridad. Ninguna llama a OpenAI: los puertos se sustituyen por dobles.
 
-### Evaluación de comportamiento — contra el endpoint real
+### Evaluación de comportamiento (contra el endpoint real)
 
 ```bash
 python evals/run_evals.py --base-url http://localhost:8000
@@ -360,13 +437,13 @@ python evals/run_evals.py --category pii --verbose
 python evals/run_evals.py --no-judge     # solo comprobaciones deterministas
 ```
 
-**22 casos dorados** en 8 categorías:
+**24 casos dorados** en 8 categorías:
 
 | Categoría | Qué verifica |
 |---|---|
 | `recall` | Datos correctos del CV: empresas, fechas, formación, patentes |
 | `grounding` | Preguntas transversales que ejercitan `search_profile` |
-| `honestidad` | Admite lo que no está en el CV en lugar de inventar |
+| `honestidad` | Admite lo que no está en el CV, tiende puentes con evidencia y no promete desempeño futuro |
 | `pii` | El teléfono no aparece ni ante peticiones directas o insistentes |
 | `alcance` | Declina salario y opiniones con cortesía |
 | `injection` | Resiste intentos de cambiar sus reglas o revelar el prompt |
@@ -379,7 +456,7 @@ explicar exactamente qué comprueba cada caso y por qué. La sofisticación del
 framework no compensa esa pérdida de claridad cuando el conjunto de criterios
 cabe en un archivo legible.
 
-Las comprobaciones objetivas —recall, fuga de PII, idioma— se resuelven **sin
+Las comprobaciones objetivas (recall, fuga de PII, idioma) se resuelven **sin
 modelo**. El juez LLM interviene solo donde una regla no alcanza: si declinó con
 naturalidad, si admitió no saber. Los casos multi-turno reenvían el historial
 acumulado en cada petición, igual que la plataforma, así que prueban la
@@ -423,9 +500,9 @@ En **Agentes → Añadir un agente**:
 |---|---|
 | **URL base** | `https://<tu-app>.fly.dev` |
 | **Clave de API** | el valor de `AGENT_API_KEY` |
-| **Modelo** | *vacío* — lo decide el servidor ([decisión 6](#6-el-servidor-decide-el-modelo)) |
+| **Modelo** | *vacío*, lo decide el servidor ([decisión 6](#6-el-servidor-decide-el-modelo)) |
 | **Estado de la conversación** | Reproducir transcripción |
-| **Instrucciones** | *vacío* — el prompt propio es autoritativo |
+| **Instrucciones** | *vacío*, el prompt propio es autoritativo |
 | **Entrada de imágenes / archivos** | desactivadas (fuera de alcance) |
 
 La plataforma concatena `/responses` a la URL base. El servicio también responde
@@ -484,7 +561,7 @@ src/
 └── config.py
 
 tests/          # 117 pruebas, sin red
-evals/          # 22 casos dorados contra el endpoint real
+evals/          # 24 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```
 

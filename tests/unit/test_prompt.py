@@ -63,9 +63,7 @@ class TestBehaviourRules:
 
         assert "Detecta el idioma" in instructions
 
-    def test_instruye_traducir_conservando_nombres_propios(
-        self, profile: Profile
-    ) -> None:
+    def test_instruye_traducir_conservando_nombres_propios(self, profile: Profile) -> None:
         """El contenido se traduce; empresas y expedientes no."""
         instructions = " ".join(build_instructions(profile).split())
 

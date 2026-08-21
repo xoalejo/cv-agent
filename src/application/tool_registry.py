@@ -28,8 +28,8 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "description": (
             "Busca en todo el CV y devuelve los fragmentos más relevantes junto con su "
             "procedencia (sección y empresa o proyecto). Úsala para preguntas que cruzan "
-            "varias secciones —por ejemplo dónde ha usado una tecnología, qué experiencia "
-            "tiene en un sector, o qué respalda una habilidad concreta— y cuando quieras "
+            "varias secciones: dónde ha usado una tecnología, qué experiencia tiene en un "
+            "sector, o qué respalda una habilidad concreta. Úsala también cuando quieras "
             "citar de dónde sale un dato. **Formula la consulta siempre en español**, "
             "aunque converses en otro idioma: el CV está redactado en español."
         ),
@@ -145,7 +145,6 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 ]
 
 
-
 class ToolRegistry:
     """Ejecuta las herramientas del agente contra el perfil."""
 
@@ -196,8 +195,7 @@ class ToolRegistry:
         return {
             "query": query,
             "matches": [
-                {"text": fragment.text, "source": fragment.citation}
-                for fragment in fragments
+                {"text": fragment.text, "source": fragment.citation} for fragment in fragments
             ],
             "note": (
                 "Sin coincidencias: el CV no cubre ese tema."
@@ -295,17 +293,14 @@ class ToolRegistry:
             return {"category": match.name, "skills": list(match.skills)}
 
         return [
-            {"category": c.name, "skills": list(c.skills)}
-            for c in profile.skill_categories
+            {"category": c.name, "skills": list(c.skills)} for c in profile.skill_categories
         ]
 
     @staticmethod
     def _get_contact_info(profile: Profile, _: dict[str, Any]) -> dict[str, Any]:
         channels = allowed_contact_channels(profile.contact_channels)
         return {
-            "channels": [
-                {"kind": c.kind, "value": c.value, "url": c.url} for c in channels
-            ],
+            "channels": [{"kind": c.kind, "value": c.value, "url": c.url} for c in channels],
             "note": (
                 "Estos son los únicos canales disponibles. No hay teléfono ni "
                 "domicilio que compartir."

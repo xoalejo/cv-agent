@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 def _client_fingerprint(request: Request, credential: str | None) -> str:
     """Identifica al cliente para efectos de límite de tasa.
 
-    Se usa un prefijo de la credencial —nunca la credencial completa— para no
+    Se usa un prefijo de la credencial, nunca la credencial completa, para no
     exponerla si esta estructura acabara en un log o en un volcado de memoria.
     """
     if credential:

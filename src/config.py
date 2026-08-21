@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     #:     python scripts/check_model.py --list --prefix gpt-5
     openai_model: str = Field(default="gpt-5.6-luna")
 
+    #: Esfuerzo de razonamiento del modelo ("minimal", "low", "medium", "high").
+    #:
+    #: Esta familia de modelos NO admite `temperature`: la API rechaza cualquier
+    #: valor distinto del predeterminado. El control disponible es este. Se usa
+    #: "low" porque la tarea es responder con datos que ya están en el contexto,
+    #: no resolver un problema: subir el esfuerzo añade latencia y costo sin
+    #: mejorar respuestas que no requieren deliberación.
+    reasoning_effort: str = Field(default="low")
+
     request_timeout_seconds: float = Field(default=60.0)
 
     #: Vueltas máximas al modelo dentro de un turno (control de costo).

@@ -1,7 +1,7 @@
 """Pruebas del caso de uso: el ciclo completo de un turno.
 
-Se prueba entero —instrucciones, llamada al motor, ejecución de herramientas,
-reinyección— sin tocar la red, sustituyendo el puerto `LLMEngine` por un doble.
+Se prueba entero (instrucciones, llamada al motor, ejecución de herramientas,
+reinyección) sin tocar la red, sustituyendo el puerto `LLMEngine` por un doble.
 """
 
 from __future__ import annotations
@@ -101,9 +101,7 @@ class TestToolLoop:
         self, tools: ToolRegistry, profile_repository: StaticProfileRepository
     ) -> None:
         """Los ítems del modelo vuelven al input junto con el resultado."""
-        engine = FakeEngine(
-            [tool_response("get_patents"), text_response("Tiene 3 patentes.")]
-        )
+        engine = FakeEngine([tool_response("get_patents"), text_response("Tiene 3 patentes.")])
         use_case = build_use_case(engine, tools, profile_repository)
 
         use_case.execute([user_message("¿Patentes?")])
@@ -190,9 +188,7 @@ class TestStatelessness:
     def test_no_muta_el_historial_recibido(
         self, tools: ToolRegistry, profile_repository: StaticProfileRepository
     ) -> None:
-        engine = FakeEngine(
-            [tool_response("get_patents"), text_response("Tres patentes.")]
-        )
+        engine = FakeEngine([tool_response("get_patents"), text_response("Tres patentes.")])
         use_case = build_use_case(engine, tools, profile_repository)
 
         history = [user_message("¿Patentes?")]

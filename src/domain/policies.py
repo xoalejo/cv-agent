@@ -70,8 +70,8 @@ def contains_contact_data(text: str) -> bool:
 def redact_contact_data(text: str, language: Language = "es") -> str:
     """Sustituye cualquier secuencia con forma de teléfono por un marcador.
 
-    Se aplica sobre la respuesta final del agente. Si nunca dispara —que es lo
-    esperado, porque el dato no está en el sistema— no altera el texto.
+    Se aplica sobre la respuesta final del agente. Si nunca dispara, que es lo
+    esperado porque el dato no está en el sistema, no altera el texto.
     """
     marker = _REDACTION.get(language, _REDACTION["es"])
     redacted = text

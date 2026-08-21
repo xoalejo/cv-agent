@@ -7,7 +7,7 @@ alcance no aporta: lo que se mide aquí son reglas concretas sobre respuestas
 concretas, y poder explicar exactamente qué comprueba cada caso vale más que la
 sofisticación del framework.
 
-Las comprobaciones objetivas —recall, fuga de PII, idioma— se resuelven sin
+Las comprobaciones objetivas (recall, fuga de PII, idioma) se resuelven sin
 modelo. El juez LLM solo interviene donde una regla no alcanza: si declinó con
 naturalidad, si admitió no saber en lugar de inventar.
 
@@ -54,6 +54,7 @@ def _retry_after(response: httpx.Response) -> int:
         return max(1, min(120, int(float(raw))))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return _DEFAULT_BACKOFF_SECONDS
+
 
 _JUDGE_PROMPT = """\
 Eres un evaluador estricto de respuestas de un agente conversacional de CV.
@@ -132,9 +133,7 @@ class AgentClient:
         started = time.perf_counter()
 
         for turn in turns:
-            history.append(
-                {"role": "user", "content": [{"type": "input_text", "text": turn}]}
-            )
+            history.append({"role": "user", "content": [{"type": "input_text", "text": turn}]})
             answer = self._post(history).json().get("output_text", "")
             history.append(
                 {"role": "assistant", "content": [{"type": "output_text", "text": answer}]}
@@ -319,9 +318,7 @@ def main() -> int:
 
     client = AgentClient(args.base_url, args.api_key)
     try:
-        results = [
-            run_case(client, case, use_judge=not args.no_judge) for case in cases
-        ]
+        results = [run_case(client, case, use_judge=not args.no_judge) for case in cases]
     finally:
         client.close()
 

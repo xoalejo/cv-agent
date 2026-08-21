@@ -1,6 +1,6 @@
 """Composition root: el único lugar donde se conocen las implementaciones.
 
-Aquí —y solo aquí— se decide que el motor es OpenAI, que el perfil vive en código
+Aquí, y solo aquí, se decide que el motor es OpenAI, que el perfil vive en código
 y que la búsqueda es léxica. El resto del sistema conversa con puertos. Cambiar
 cualquiera de esas piezas es cambiar estas líneas.
 """
@@ -36,6 +36,7 @@ def build_use_case(settings: Settings) -> AnswerProfileQuestion:
         api_key=settings.openai_api_key,
         model=settings.openai_model,
         timeout=settings.request_timeout_seconds,
+        reasoning_effort=settings.reasoning_effort,
     )
     return AnswerProfileQuestion(
         engine=engine,
@@ -56,9 +57,7 @@ async def lifespan(app: FastAPI):
     if not settings.auth_enabled:
         # Arrancar sin autenticación solo tiene sentido en desarrollo. Si pasa en
         # otro entorno, que quede constancia ruidosa en los logs.
-        logger.warning(
-            "Servicio sin autenticación: define AGENT_API_KEY antes de exponerlo."
-        )
+        logger.warning("Servicio sin autenticación: define AGENT_API_KEY antes de exponerlo.")
 
     try:
         app.state.answer_question = build_use_case(settings)

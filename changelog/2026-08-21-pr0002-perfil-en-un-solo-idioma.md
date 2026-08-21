@@ -40,14 +40,14 @@ Al fijar la premisa del corpus en español apareció un defecto previo: la
 coincidencia por subcadena operaba en cualquier posición de la palabra, de modo
 que `"files"` casaba con `"per**files**"` y devolvía fragmentos sin relación con
 la consulta. La coincidencia se ancla ahora al inicio de palabra, que era la
-intención original —`"kube"` → `"kubernetes"`— sin el ruido.
+intención original (`"kube"` encuentra `"kubernetes"`) sin el ruido.
 
 ## Archivos
 
 - `src/domain/profile.py`, `src/domain/policies.py`
 - `src/infrastructure/profile_data.py` (regenerado), `src/infrastructure/lexical_search.py`
 - `src/application/prompt.py`, `src/application/tool_registry.py`, `src/application/ports.py`
-- `tests/unit/` — las pruebas que verificaban la estructura bilingüe se
+- `tests/unit/`, las pruebas que verificaban la estructura bilingüe se
   reescribieron para verificar las propiedades del nuevo diseño.
 
 117 pruebas en verde.

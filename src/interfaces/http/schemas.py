@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 #: Cota defensiva sobre el historial que acepta un turno. La plataforma reenvía
 #: la transcripción completa en cada llamada, así que sin un tope el tamaño del
-#: contexto —y su costo— crece con la conversación sin límite.
+#: contexto, y su costo, crece con la conversación sin límite.
 MAX_INPUT_ITEMS = 200
 MAX_TEXT_LENGTH = 32_000
 
@@ -42,9 +42,7 @@ class ResponsesRequest(BaseModel):
 
     @field_validator("input")
     @classmethod
-    def _validate_input(
-        cls, value: str | list[dict[str, Any]]
-    ) -> str | list[dict[str, Any]]:
+    def _validate_input(cls, value: str | list[dict[str, Any]]) -> str | list[dict[str, Any]]:
         if isinstance(value, str):
             if not value.strip():
                 raise ValueError("El campo 'input' no puede estar vacío.")
@@ -55,9 +53,7 @@ class ResponsesRequest(BaseModel):
         if not value:
             raise ValueError("El campo 'input' no puede ser una lista vacía.")
         if len(value) > MAX_INPUT_ITEMS:
-            raise ValueError(
-                f"El historial excede el máximo de {MAX_INPUT_ITEMS} elementos."
-            )
+            raise ValueError(f"El historial excede el máximo de {MAX_INPUT_ITEMS} elementos.")
         for item in value:
             if not isinstance(item, dict):
                 raise ValueError("Cada elemento de 'input' debe ser un objeto.")

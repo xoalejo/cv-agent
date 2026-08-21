@@ -58,9 +58,7 @@ class TestRecall:
 
 
 class TestProvenance:
-    def test_cada_fragmento_trae_su_procedencia(
-        self, search: LexicalProfileSearch
-    ) -> None:
+    def test_cada_fragmento_trae_su_procedencia(self, search: LexicalProfileSearch) -> None:
         results = search.search("Kubernetes", limit=3)
 
         assert results
@@ -87,9 +85,7 @@ class TestEdgeCases:
     ) -> None:
         assert search.search("de la que con") == []
 
-    def test_tema_ausente_del_cv_no_devuelve_nada(
-        self, search: LexicalProfileSearch
-    ) -> None:
+    def test_tema_ausente_del_cv_no_devuelve_nada(self, search: LexicalProfileSearch) -> None:
         # El CV no menciona nada de repostería.
         assert search.search("repostería francesa croissants") == []
 

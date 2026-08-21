@@ -1,7 +1,7 @@
 """Caso de uso: responder una pregunta sobre el perfil.
 
-Orquesta el ciclo completo de un turno —instrucciones, llamada al motor,
-ejecución de herramientas, reinyección de resultados— sin conocer el proveedor ni
+Orquesta el ciclo completo de un turno (instrucciones, llamada al motor,
+ejecución de herramientas, reinyección de resultados- sin conocer el proveedor ni
 el transporte HTTP. Eso es lo que permite probarlo entero sin red.
 
 Sobre la memoria del hilo: este caso de uso es **stateless por diseño**. La
@@ -181,8 +181,8 @@ class AnswerProfileQuestion:
         iterations: int,
     ) -> ConversationResult:
         # Última capa de la política de divulgación: si algo con forma de teléfono
-        # llegó a la respuesta —por ejemplo porque quien pregunta lo pegó en el
-        # chat y pidió confirmarlo—, no sale de aquí.
+        # llegó a la respuesta, por ejemplo porque quien pregunta lo pegó en el
+        # chat y pidió confirmarlo-, no sale de aquí.
         safe_text = redact_contact_data(response.output_text, language)
         return ConversationResult(
             response_id=response.response_id,

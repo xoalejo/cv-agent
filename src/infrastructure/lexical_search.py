@@ -113,9 +113,7 @@ class LexicalProfileSearch:
             )
             entries.append(cls._entry(header, Section.EXPERIENCE, experience.company))
             for achievement in experience.achievements:
-                entries.append(
-                    cls._entry(achievement, Section.EXPERIENCE, experience.company)
-                )
+                entries.append(cls._entry(achievement, Section.EXPERIENCE, experience.company))
 
         for education in profile.education:
             text = f"{education.degree}. {education.institution} ({education.period})."
@@ -126,15 +124,11 @@ class LexicalProfileSearch:
             entries.append(cls._entry(text, Section.SKILLS, category.name))
 
         for certification in profile.certifications:
-            text = (
-                f"{certification.name} — {certification.issuer} ({certification.year})."
-            )
+            text = f"{certification.name}, {certification.issuer} ({certification.year})."
             entries.append(cls._entry(text, Section.CERTIFICATIONS, certification.issuer))
 
         for patent in profile.patents:
-            text = (
-                f"{patent.title} Expediente IMPI {patent.file_number}. {patent.status}."
-            )
+            text = f"{patent.title} Expediente IMPI {patent.file_number}. {patent.status}."
             entries.append(cls._entry(text, Section.PATENTS, patent.file_number))
 
         for project in profile.projects:
@@ -170,12 +164,10 @@ class LexicalProfileSearch:
             #
             # La coincidencia se ancla al inicio de palabra a propósito. Buscar la
             # subcadena en cualquier posición produce falsos positivos que cruzan
-            # idiomas —"files" dentro de "perfiles"— y ensucian los resultados con
+            # idiomas ("files" dentro de "perfiles") y ensucian los resultados con
             # fragmentos que no tienen relación con la consulta.
             for token in query_tokens - overlap:
-                if len(token) > 3 and any(
-                    word.startswith(token) for word in entry.words
-                ):
+                if len(token) > 3 and any(word.startswith(token) for word in entry.words):
                     score += 0.5
 
             # La consulta completa presente literalmente es la señal más fuerte.

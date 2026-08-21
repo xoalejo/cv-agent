@@ -1,6 +1,6 @@
 """Pruebas de la capa HTTP: contrato, seguridad y manejo de errores.
 
-Se levanta la aplicación real —con su wiring, middleware y manejadores de error—
+Se levanta la aplicación real, con su wiring, middleware y manejadores de error,
 y solo se sustituye el motor del modelo. Así se valida el contrato que verá la
 plataforma sin gastar una llamada al proveedor.
 """
@@ -326,9 +326,7 @@ class TestProviderRateLimits:
         return client
 
     def test_cuota_del_proveedor_devuelve_429_no_502(self) -> None:
-        client = self._client_with(
-            LLMRateLimitError("rate limit exceeded", retry_after=17)
-        )
+        client = self._client_with(LLMRateLimitError("rate limit exceeded", retry_after=17))
         try:
             response = client.post("/responses", json={"input": "hola"}, headers=AUTH)
 

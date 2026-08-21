@@ -2,7 +2,7 @@
 
 **Rama:** `main` (scaffold inicial del proyecto)
 **Fecha:** 2026-08-21
-**Hito:** 1 y 2 del plan — núcleo conversando + herramientas y guardrails
+**Hito:** 1 y 2 del plan, núcleo conversando + herramientas y guardrails
 
 ## Motivación
 
@@ -26,7 +26,7 @@ el esfuerzo queda donde el reto sí evalúa: grounding, herramientas, guardrails
 seguridad y evaluación.
 
 **Clean Architecture con dos beneficios concretos**, no por dogma:
-1. El puerto `LLMEngine` deja el proveedor sustituible — la misma tesis que
+1. El puerto `LLMEngine` deja el proveedor sustituible, la misma tesis que
    sostiene a Open Responses, aplicada al código propio.
 2. Con los puertos en dobles, todo el núcleo se prueba sin red: 109 pruebas
    corren en 1.4 s sin gastar una sola llamada al proveedor.
@@ -47,7 +47,7 @@ que sustituirlo por embeddings no tocaría el caso de uso.
 El teléfono personal no se comparte nunca. Se implementa como propiedad del
 sistema, no como esperanza sobre el modelo:
 
-1. El número **no existe** en los datos del perfil — no hay dato que filtrar.
+1. El número **no existe** en los datos del perfil, no hay dato que filtrar.
 2. `ALLOWED_CONTACT_KINDS` restringe los canales publicables en el dominio.
 3. `redact_contact_data` revisa la salida final por si el número entró por otra
    vía (por ejemplo, alguien que ya tiene el CV lo pega y pide confirmarlo).
@@ -65,15 +65,15 @@ vez y el agente no puede dar respuestas distintas según el idioma de la pregunt
 
 ## Archivos
 
-- `src/domain/` — entidades (`profile.py`), fragmentos con procedencia
+- `src/domain/`, entidades (`profile.py`), fragmentos con procedencia
   (`fragment.py`) y políticas de divulgación (`policies.py`).
-- `src/application/` — puertos (`ports.py`), caso de uso con el ciclo de
+- `src/application/`, puertos (`ports.py`), caso de uso con el ciclo de
   herramientas (`conversation.py`), construcción del prompt (`prompt.py`) y
   registro de herramientas (`tool_registry.py`).
-- `src/infrastructure/` — adaptador de OpenAI (`openai_engine.py`), perfil como
+- `src/infrastructure/`, adaptador de OpenAI (`openai_engine.py`), perfil como
   datos (`profile_data.py`) y búsqueda léxica (`lexical_search.py`).
-- `src/interfaces/http/` — DTOs del protocolo, seguridad, rutas y composition root.
-- `tests/` — 109 pruebas, todas sin red.
+- `src/interfaces/http/`, DTOs del protocolo, seguridad, rutas y composition root.
+- `tests/`, 109 pruebas, todas sin red.
 
 ## Estado
 

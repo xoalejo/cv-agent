@@ -1,6 +1,6 @@
 """Puertos: los contratos que la capa de aplicación necesita del exterior.
 
-Definirlos aquí —y no importar adaptadores concretos— es lo que invierte la
+Definirlos aquí, y no importar adaptadores concretos, es lo que invierte la
 dependencia: la infraestructura se adapta a la aplicación, no al revés.
 
 El beneficio no es teórico. `LLMEngine` deja el proveedor sustituible, que es la
