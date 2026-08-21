@@ -249,6 +249,7 @@ Los PDFs en español e inglés traían datos divergentes que habrían producido
 |---|---|---|---|
 | Reconocimiento IT Masters | "entre 300 proyectos" | "among 60 projects" | **300** |
 | Categoría AppSec del stack | presente | ausente | **presente en ambos** |
+| Periodo del proyecto multi-agente | "2026" | "2025 – Present" | **2025 – Presente** |
 
 El perfil vive como estructura de datos única con ambos idiomas en el mismo
 objeto, precisamente para que no vuelvan a desincronizarse.

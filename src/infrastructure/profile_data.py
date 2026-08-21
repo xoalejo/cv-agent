@@ -518,7 +518,9 @@ _PROJECTS = (
             "Sistema Multi-Agente con Mejora Autónoma",
             "Multi-Agent System with Autonomous Improvement",
         ),
-        period="2025 – 2026",
+        # Proyecto en curso. El CV en español registraba solo "2026" y el inglés
+        # "2025 – Present"; el periodo correcto es desde 2025 y sigue activo.
+        period="2025 – Presente / 2025 – Present",
         description=_t(
             "Diseño e implementación desde cero de un sistema multi-agente para una "
             "plataforma SaaS financiera en producción: agentes especializados en asesoría "
