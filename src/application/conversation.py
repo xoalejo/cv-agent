@@ -43,14 +43,19 @@ _EXHAUSTED_MESSAGE = {
 # mensajes del sistema y del marcador de redacción; el modelo detecta el idioma de
 # la conversación por su cuenta.
 _ES_MARKERS = re.compile(
-    r"\b(qué|que|cuál|cual|cómo|como|dónde|donde|cuándo|cuando|quién|quien|"
-    r"experiencia|trabajo|proyectos|habilidades|años|empresa|puedes|tiene|háblame|"
-    r"cuéntame|para|con|del|los|las|una|por)\b",
+    r"\b(el|la|los|las|un|una|de|del|al|en|y|que|qué|por|para|con|sin|sobre|"
+    r"su|sus|se|es|son|fue|ha|han|tiene|tienen|más|como|cómo|pero|cuando|"
+    r"cuándo|donde|dónde|quien|quién|cual|cuál|entre|desde|hasta|también|"
+    r"experiencia|trabajo|trabajó|proyectos|habilidades|años|empresa|puedes|"
+    r"háblame|cuéntame|aparece|cuenta)\b",
     re.IGNORECASE,
 )
 _EN_MARKERS = re.compile(
-    r"\b(what|which|how|where|when|who|experience|work|projects|skills|years|"
-    r"company|can|does|tell|about|with|the|his|your)\b",
+    r"\b(the|of|and|to|in|is|are|was|were|has|have|had|he|his|him|it|its|"
+    r"for|with|that|this|these|those|on|at|as|by|from|an|a|does|did|do|can|"
+    r"could|will|would|not|but|or|so|than|then|there|they|their|you|your|"
+    r"about|into|over|under|before|after|while|yes|no|what|which|how|where|"
+    r"when|who|experience|work|projects|skills|years|company|tell)\b",
     re.IGNORECASE,
 )
 
@@ -91,12 +96,23 @@ def extract_last_user_text(input_items: list[dict[str, Any]]) -> str:
     return ""
 
 
+#: Palabras que se examinan para decidir el idioma.
+#:
+#: Se mira solo el arranque porque ahí está la voz narrativa. Una respuesta en
+#: inglés puede citar después títulos de patente registrados en español, y
+#: contar el texto completo inclinaría la detección hacia el idioma de las citas
+#: en lugar del idioma en que se está respondiendo. Doce palabras cubren la
+#: oración de apertura, que es anterior a cualquier cita.
+_LANGUAGE_SAMPLE_WORDS = 12
+
+
 def detect_language(text: str) -> Language:
-    """Heurística mínima ES/EN. Ante la duda, español."""
+    """Heurística mínima ES/EN sobre el arranque del texto. Ante la duda, español."""
     if not text.strip():
         return "es"
-    spanish = len(_ES_MARKERS.findall(text))
-    english = len(_EN_MARKERS.findall(text))
+    muestra = " ".join(text.split()[:_LANGUAGE_SAMPLE_WORDS])
+    spanish = len(_ES_MARKERS.findall(muestra))
+    english = len(_EN_MARKERS.findall(muestra))
     return "en" if english > spanish else "es"
 
 

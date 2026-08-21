@@ -236,3 +236,28 @@ class TestLanguageDetection:
 
     def test_sin_mensajes_de_usuario(self) -> None:
         assert extract_last_user_text([]) == ""
+
+
+class TestLanguageDetectionWithCitations:
+    """El idioma se decide por la voz narrativa, no por el de las citas.
+
+    Los títulos de patente están registrados en español y se conservan sin
+    traducir. Una respuesta en inglés que los cite contiene bastante español, y
+    contar el texto completo la clasificaría mal.
+    """
+
+    def test_respuesta_en_ingles_que_cita_titulos_en_espanol(self) -> None:
+        respuesta = (
+            "Yes. Oscar has **three patent applications pending before IMPI**: "
+            "- **Sistema de Gestión y Trazabilidad de Documentos mediante "
+            "Procesamiento de Lenguaje Natural (PLN) para el Transporte de Carga** "
+            "- File number: MX/a/2024/008296"
+        )
+        assert detect_language(respuesta) == "en"
+
+    def test_respuesta_en_espanol_con_terminos_tecnicos_en_ingles(self) -> None:
+        respuesta = (
+            "Ha trabajado con RAG pipelines, embeddings y function calling en "
+            "ABBA Networks, usando Databricks y Power BI para la reportería."
+        )
+        assert detect_language(respuesta) == "es"
