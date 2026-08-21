@@ -93,7 +93,7 @@ Pruebas y evaluación:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                              # 140 pruebas, sin red
+pytest                                              # 151 pruebas, sin red
 python evals/run_evals.py --base-url http://localhost:8000
 ```
 
@@ -167,7 +167,7 @@ No por dogma. Se justifica por dos cosas medibles:
    OpenAI sustituible. Es la misma tesis que sostiene a Open Responses, desacoplar
    el agente del proveedor, aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
-   sin llamar a ningún servicio: **140 pruebas en ~1.6 s, sin gastar un token**.
+   sin llamar a ningún servicio: **151 pruebas en ~2 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
 ### 3. Por qué no se usó RAG con base vectorial
@@ -448,7 +448,7 @@ pruebas*.
 ### Pruebas unitarias e integración (sin red)
 
 ```bash
-pytest -q     # 140 pruebas en ~1.6 s
+pytest -q     # 151 pruebas en ~2 s
 ```
 
 Cubren las políticas de divulgación (incluidos los falsos positivos), la búsqueda
@@ -569,15 +569,24 @@ En **Agentes → Añadir un agente**:
 
 | Campo | Valor |
 |---|---|
-| **URL base** | `https://cv-agent-amber.vercel.app` |
+| **URL base** | `https://cv-agent-amber.vercel.app/v1` |
 | **Clave de API** | el valor de `AGENT_API_KEY` |
 | **Modelo** | *vacío*, lo decide el servidor ([decisión 9](#9-el-servidor-decide-el-modelo)) |
 | **Estado de la conversación** | Reproducir transcripción |
 | **Instrucciones** | *vacío*, el prompt propio es autoritativo |
 | **Entrada de imágenes / archivos** | desactivadas (fuera de alcance) |
 
-La plataforma concatena `/responses` a la URL base. El servicio también responde
-bajo `/v1`, así que registrar `https://cv-agent-amber.vercel.app/v1` funciona igual.
+La plataforma concatena `/responses` a la URL base.
+
+**Registra la ruta versionada.** `/v1` designa el contrato al que el servicio se
+compromete: la forma del objeto `Response`, los eventos del flujo y los códigos
+de error documentados. Un cambio incompatible viviría en `/v2` y `/v1` seguiría
+respondiendo igual. Eso importa porque quien consume este endpoint registra la
+URL una vez y no hay forma de pedirle que actualice si el contrato cambia bajo
+sus pies.
+
+La raíz responde igual, como alias de conveniencia para pruebas con curl, pero
+sigue a la última versión y por eso no conviene registrarla.
 
 El servicio publica una **tarjeta de agente A2A** en
 `/.well-known/agent-card.json`, sin autenticación porque un mecanismo de
@@ -635,7 +644,7 @@ src/
 │   └── security.py         # Auth y límite de tasa
 └── config.py
 
-tests/          # 140 pruebas, sin red
+tests/          # 151 pruebas, sin red
 evals/          # 26 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```

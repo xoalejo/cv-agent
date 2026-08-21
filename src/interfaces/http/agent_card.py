@@ -39,6 +39,10 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
     que redesplegar con el dominio escrito a mano.
     """
     base = base_url.rstrip("/")
+    # Se anuncia la ruta versionada: es el contrato al que el servicio se
+    # compromete y el que debería registrar una integración. La propia tarjeta
+    # se sirve en la raíz, como exige la convención de `/.well-known/`.
+    versioned = f"{base}/v1"
 
     return {
         "protocolVersion": "1.0",
@@ -73,18 +77,18 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
         # enlaces básicos.
         "supportedInterfaces": [
             {
-                "url": base,
+                "url": versioned,
                 "protocolBinding": "https://openresponses.org",
                 "protocolVersion": "1.0",
             },
             {
-                "url": base,
+                "url": versioned,
                 "protocolBinding": "HTTP+JSON",
                 "protocolVersion": "1.0",
             },
         ],
         # Se conservan los campos de v0.3 para consumidores que aún los lean.
-        "url": base,
+        "url": versioned,
         "preferredTransport": "HTTP+JSON",
         "version": "1.0.0",
         "documentationUrl": "https://github.com/xoalejo/cv-agent",
@@ -104,7 +108,7 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
                     "uri": "https://openresponses.org",
                     "description": "Endpoint compatible con Open Responses.",
                     "required": False,
-                    "params": {"baseUrl": base, "endpoint": f"{base}/responses"},
+                    "params": {"baseUrl": versioned, "endpoint": f"{versioned}/responses"},
                 }
             ],
         },
@@ -138,8 +142,8 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
         # Extensión no estándar: la plataforma pide la URL de Open Responses para
         # autocompletar su formulario, y el spec A2A no tiene un campo para eso.
         "openResponses": {
-            "baseUrl": base,
-            "endpoint": f"{base}/responses",
+            "baseUrl": versioned,
+            "endpoint": f"{versioned}/responses",
             "conversationState": "replay_transcript",
             "authentication": "bearer",
         },

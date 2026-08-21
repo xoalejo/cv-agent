@@ -96,11 +96,22 @@ def create_app() -> FastAPI:
             allow_headers=["Authorization", "Content-Type"],
         )
 
-    # La plataforma concatena "/responses" a la URL base que se registre. Montar
-    # también bajo "/v1" permite registrar la base con o sin ese prefijo sin
-    # tener que redesplegar.
-    app.include_router(router)
+    # Política de versionado.
+    #
+    # `/v1` es la ruta canónica y designa el contrato al que este servicio se
+    # compromete: la forma del objeto `Response`, los eventos del flujo SSE y los
+    # códigos de error documentados. Un cambio incompatible viviría en `/v2`, y
+    # `/v1` seguiría respondiendo igual.
+    #
+    # Eso importa porque quien consume este endpoint es una plataforma externa
+    # que registra la URL una vez: no hay forma de pedirle que actualice si el
+    # contrato cambia bajo sus pies.
+    #
+    # La raíz se mantiene como alias de conveniencia y sigue a la última versión.
+    # Sirve para pruebas rápidas con curl; una integración debería registrar
+    # `/v1`.
     app.include_router(router, prefix="/v1")
+    app.include_router(router)
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:

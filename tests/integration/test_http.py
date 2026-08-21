@@ -579,3 +579,40 @@ class TestAgentCardDiscovery:
         r = client.get("/.well-known/agent-card.json")
 
         assert r.headers["content-type"].startswith("application/json")
+
+
+class TestVersionado:
+    """`/v1` es la ruta canónica; la raíz es un alias de conveniencia."""
+
+    def test_ambas_rutas_responden(self) -> None:
+        # Un doble por petición: el del fixture trae una sola respuesta.
+        engine = FakeEngine([text_response("ok"), text_response("ok")])
+        client = make_client(engine)
+        try:
+            for ruta in ("/responses", "/v1/responses"):
+                r = client.post(ruta, json={"input": "hola"}, headers=AUTH)
+                assert r.status_code == 200, ruta
+        finally:
+            client.__exit__(None, None, None)
+
+    def test_la_tarjeta_anuncia_la_ruta_versionada(self, client: TestClient) -> None:
+        """Una integración registra la URL una vez: debe apuntar al contrato.
+
+        Si la tarjeta anunciara la raíz, quien se registrara quedaría atado a un
+        alias que sigue a la última versión, y un cambio incompatible le rompería
+        sin aviso.
+        """
+        card = client.get("/.well-known/agent-card.json").json()
+
+        assert card["url"].endswith("/v1")
+        assert card["openResponses"]["endpoint"].endswith("/v1/responses")
+        for interfaz in card["supportedInterfaces"]:
+            assert interfaz["url"].endswith("/v1")
+
+    def test_la_tarjeta_se_sirve_en_la_raiz(self, client: TestClient) -> None:
+        """La convención de `/.well-known/` exige la raíz, no la ruta versionada."""
+        assert client.get("/.well-known/agent-card.json").status_code == 200
+
+    def test_la_salud_responde_en_ambas(self, client: TestClient) -> None:
+        for ruta in ("/health", "/v1/health"):
+            assert client.get(ruta).status_code == 200, ruta
