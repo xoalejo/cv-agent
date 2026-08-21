@@ -387,6 +387,30 @@ class TestAgentCard:
         assert card["openResponses"]["endpoint"].endswith("/responses")
         assert card["openResponses"]["conversationState"] == "replay_transcript"
 
+    def test_las_interfaces_usan_la_forma_de_la_version_1(
+        self, client: TestClient
+    ) -> None:
+        """En v1.0 cada entrada lleva `protocolBinding`, no `transport`.
+
+        Mezclar el nombre de v0.3 dentro de la estructura de v1.0 hace que un
+        validador rechace la tarjeta completa.
+        """
+        card = client.get("/.well-known/agent-card.json").json()
+        interfaces = card["supportedInterfaces"]
+
+        assert interfaces, "debe declararse al menos una interfaz"
+        for interfaz in interfaces:
+            assert "protocolBinding" in interfaz
+            assert "transport" not in interfaz
+            assert interfaz["url"]
+
+    def test_la_version_del_protocolo_coincide_con_los_campos(
+        self, client: TestClient
+    ) -> None:
+        card = client.get("/.well-known/agent-card.json").json()
+
+        assert card["protocolVersion"].startswith("1.")
+
     def test_no_expone_credenciales(self, client: TestClient) -> None:
         """Declara que espera un Bearer, nunca cuál es."""
         cuerpo = client.get("/.well-known/agent-card.json").text

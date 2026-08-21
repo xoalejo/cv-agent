@@ -41,7 +41,7 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
     base = base_url.rstrip("/")
 
     return {
-        "protocolVersion": "0.3.0",
+        "protocolVersion": "1.0",
         "name": f"Agente de CV de {profile.full_name}",
         "description": (
             f"Conversa sobre la trayectoria profesional de {profile.full_name}: "
@@ -49,15 +49,23 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
             "Responde en español o inglés según el idioma de la pregunta y "
             "mantiene la continuidad del hilo."
         ),
-        "url": base,
-        # El transporte real es HTTP con cuerpos JSON, no JSON-RPC.
-        "preferredTransport": "HTTP+JSON",
-        # `supportedInterfaces` es la forma que introdujo A2A v0.3 y sustituye al
-        # par `url`/`preferredTransport`. Se declaran ambas: los consumidores
-        # antiguos leen la primera y los nuevos exigen esta.
+        # `supportedInterfaces` es la forma de A2A v1.0 y sustituye al trío
+        # `url` / `preferredTransport` / `additionalInterfaces`. Cada entrada
+        # declara su propio enlace de protocolo; la primera es la preferida.
+        #
+        # El campo dentro de cada entrada es `protocolBinding`, no `transport`:
+        # ese era el nombre en v0.3, y mezclarlos hace que un validador de v1.0
+        # rechace la tarjeta entera.
         "supportedInterfaces": [
-            {"transport": "HTTP+JSON", "url": base},
+            {
+                "url": base,
+                "protocolBinding": "HTTP+JSON",
+                "protocolVersion": "1.0",
+            },
         ],
+        # Se conservan los campos de v0.3 para consumidores que aún los lean.
+        "url": base,
+        "preferredTransport": "HTTP+JSON",
         "version": "1.0.0",
         "documentationUrl": "https://github.com/xoalejo/cv-agent",
         "provider": {
