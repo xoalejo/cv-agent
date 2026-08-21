@@ -65,10 +65,16 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
         # ciertas y apuntan a la misma URL: un cliente que busque Open Responses
         # reconoce la primera, y uno que solo entienda los enlaces básicos de A2A
         # se queda con la segunda.
+        # La lista va por orden de preferencia. La primera identifica el
+        # protocolo concreto mediante el URI canónico de su especificación, que
+        # es lo que A2A recomienda para enlaces no estándar: `protocolBinding` es
+        # de forma libre y "debería ser un URI". La segunda describe el mismo
+        # endpoint en términos genéricos, para un cliente que solo entienda los
+        # enlaces básicos.
         "supportedInterfaces": [
             {
                 "url": base,
-                "protocolBinding": "https://www.openresponses.org/specification",
+                "protocolBinding": "https://openresponses.org",
                 "protocolVersion": "1.0",
             },
             {
@@ -92,6 +98,15 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
             "streaming": True,
             "pushNotifications": False,
             "stateTransitionHistory": False,
+            # Mecanismo estándar de A2A para declarar extensiones de protocolo.
+            "extensions": [
+                {
+                    "uri": "https://openresponses.org",
+                    "description": "Endpoint compatible con Open Responses.",
+                    "required": False,
+                    "params": {"baseUrl": base, "endpoint": f"{base}/responses"},
+                }
+            ],
         },
         # El historial completo llega en cada petición; el servicio no guarda
         # estado entre llamadas.
