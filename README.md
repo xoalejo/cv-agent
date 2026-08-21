@@ -92,7 +92,7 @@ Pruebas y evaluación:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                              # 122 pruebas, sin red
+pytest                                              # 127 pruebas, sin red
 python evals/run_evals.py --base-url http://localhost:8000
 ```
 
@@ -166,7 +166,7 @@ No por dogma. Se justifica por dos cosas medibles:
    OpenAI sustituible. Es la misma tesis que sostiene a Open Responses, desacoplar
    el agente del proveedor, aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
-   sin llamar a ningún servicio: **122 pruebas en ~1.5 s, sin gastar un token**.
+   sin llamar a ningún servicio: **127 pruebas en ~1.4 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
 ### 3. Por qué no se usó RAG con base vectorial
@@ -420,7 +420,7 @@ pruebas*.
 ### Pruebas unitarias e integración (sin red)
 
 ```bash
-pytest -q     # 122 pruebas en ~1.5 s
+pytest -q     # 127 pruebas en ~1.4 s
 ```
 
 Cubren las políticas de divulgación (incluidos los falsos positivos), la búsqueda
@@ -524,6 +524,13 @@ En **Agentes → Añadir un agente**:
 La plataforma concatena `/responses` a la URL base. El servicio también responde
 bajo `/v1`, así que registrar `https://cv-agent-amber.vercel.app/v1` funciona igual.
 
+El servicio publica una **tarjeta de agente A2A** en
+`/.well-known/agent-card.json`, sin autenticación porque un mecanismo de
+descubrimiento que exigiera credenciales no podría cumplir su función. Declara
+únicamente lo que el servicio hace: en particular `streaming: false`, ya que el
+endpoint es síncrono y rechaza `stream: true` de forma explícita. Anunciar una
+capacidad inexistente rompería a cualquier cliente que la creyera disponible.
+
 ---
 
 ## Limitaciones conocidas
@@ -576,7 +583,7 @@ src/
 │   └── security.py         # Auth y límite de tasa
 └── config.py
 
-tests/          # 122 pruebas, sin red
+tests/          # 127 pruebas, sin red
 evals/          # 26 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```

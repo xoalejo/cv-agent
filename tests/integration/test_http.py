@@ -364,3 +364,44 @@ class TestProviderRateLimits:
 
         settings_factory.cache_clear()
         assert Settings().rate_limit_requests >= 30
+
+
+class TestAgentCard:
+    """Tarjeta A2A: descubrimiento automático sin exponer nada sensible."""
+
+    def test_se_publica_sin_autenticacion(self, client: TestClient) -> None:
+        """Un mecanismo de descubrimiento que exigiera credencial sería inútil."""
+        response = client.get("/.well-known/agent-card.json")
+
+        assert response.status_code == 200
+
+    def test_declara_los_datos_del_agente(self, client: TestClient) -> None:
+        card = client.get("/.well-known/agent-card.json").json()
+
+        assert "Oscar Alejo" in card["name"]
+        assert card["version"]
+        assert card["skills"][0]["examples"]
+
+    def test_no_declara_streaming(self, client: TestClient) -> None:
+        """El endpoint es síncrono; anunciar streaming rompería a quien lo creyera."""
+        card = client.get("/.well-known/agent-card.json").json()
+
+        assert card["capabilities"]["streaming"] is False
+
+    def test_declara_el_endpoint_de_open_responses(self, client: TestClient) -> None:
+        card = client.get("/.well-known/agent-card.json").json()
+
+        assert card["openResponses"]["endpoint"].endswith("/responses")
+        assert card["openResponses"]["conversationState"] == "replay_transcript"
+
+    def test_no_expone_credenciales(self, client: TestClient) -> None:
+        """Declara que espera un Bearer, nunca cuál es."""
+        cuerpo = client.get("/.well-known/agent-card.json").text
+
+        assert API_KEY not in cuerpo
+        assert "sk-" not in cuerpo
+        assert card_declara_bearer(cuerpo)
+
+
+def card_declara_bearer(cuerpo: str) -> bool:
+    return '"scheme": "bearer"' in cuerpo or '"scheme":"bearer"' in cuerpo

@@ -13,6 +13,8 @@ from src.infrastructure.openai_engine import (
     LLMEngineError,
     LLMRateLimitError,
 )
+from src.infrastructure.profile_data import StaticProfileRepository
+from src.interfaces.http.agent_card import build_agent_card
 from src.interfaces.http.schemas import ResponsesReply, ResponsesRequest
 from src.interfaces.http.security import authorize
 
@@ -64,6 +66,18 @@ async def health(request: Request) -> dict[str, object]:
         "agent": "cv-agent",
         "engine_ready": getattr(request.app.state, "answer_question", None) is not None,
     }
+
+
+@router.get("/.well-known/agent-card.json", tags=["operación"])
+async def agent_card(request: Request) -> dict[str, object]:
+    """Tarjeta de agente A2A para descubrimiento automático.
+
+    Sin autenticación a propósito: un mecanismo de descubrimiento que exigiera
+    credenciales no podría cumplir su función. No expone secretos, solo declara
+    que el endpoint espera un token Bearer.
+    """
+    base = str(request.base_url).rstrip("/")
+    return build_agent_card(StaticProfileRepository().get(), base_url=base)
 
 
 @router.post(
