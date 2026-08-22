@@ -188,30 +188,11 @@ class AnswerProfileQuestion:
                     iterations=iteration,
                 )
 
-            # Los ítems del modelo vuelven al input para que el siguiente turno
-            # conserve el hilo de razonamiento que llevó a pedir la herramienta.
-            items.extend(last_response.output_items)
-
-            for call in last_response.tool_calls:
-                tools_invoked.append(call.name)
-                result = self._tools.execute(call.name, call.arguments)
-                items.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": call.call_id,
-                        "output": json.dumps(result, ensure_ascii=False),
-                    }
-                )
+            self._apply_tool_calls(last_response, items, tools_invoked)
 
         # Se agotaron las vueltas: se responde algo útil en vez de fallar.
-        return ConversationResult(
-            response_id=last_response.response_id if last_response else "",
-            output_text=_EXHAUSTED_MESSAGE[language],
-            model=last_response.model if last_response else "",
-            usage=last_response.usage if last_response else {},
-            tools_invoked=tuple(tools_invoked),
-            iterations=self._max_iterations,
-            exhausted=True,
+        return self._exhausted(
+            last_response, language=language, tools_invoked=tools_invoked
         )
 
     def execute_stream(
@@ -269,31 +250,54 @@ class AnswerProfileQuestion:
                 )
                 return
 
-            items.extend(last.output_items)
-            for call in last.tool_calls:
-                tools_invoked.append(call.name)
-                result = self._tools.execute(call.name, call.arguments)
-                items.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": call.call_id,
-                        "output": json.dumps(result, ensure_ascii=False),
-                    }
-                )
+            self._apply_tool_calls(last, items, tools_invoked)
 
         # Se agotaron las vueltas sin respuesta final.
         if resto := guard.flush():
             yield AnswerDelta(resto)
         yield AnswerCompleted(
-            ConversationResult(
-                response_id=last.response_id if last else "",
-                output_text=_EXHAUSTED_MESSAGE[language],
-                model=last.model if last else "",
-                usage=last.usage if last else {},
-                tools_invoked=tuple(tools_invoked),
-                iterations=self._max_iterations,
-                exhausted=True,
+            self._exhausted(last, language=language, tools_invoked=tools_invoked)
+        )
+
+    def _apply_tool_calls(
+        self,
+        response: EngineResponse,
+        items: list[dict[str, Any]],
+        tools_invoked: list[str],
+    ) -> None:
+        """Ejecuta las herramientas pedidas y reinyecta todo en el input.
+
+        Los ítems del modelo vuelven junto con los resultados para que el
+        siguiente turno conserve el hilo de razonamiento que llevó a pedirlas.
+        """
+        items.extend(response.output_items)
+        for call in response.tool_calls:
+            tools_invoked.append(call.name)
+            result = self._tools.execute(call.name, call.arguments)
+            items.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": call.call_id,
+                    "output": json.dumps(result, ensure_ascii=False),
+                }
             )
+
+    def _exhausted(
+        self,
+        last: EngineResponse | None,
+        *,
+        language: Language,
+        tools_invoked: list[str],
+    ) -> ConversationResult:
+        """Resultado cuando se agotan las vueltas sin respuesta final."""
+        return ConversationResult(
+            response_id=last.response_id if last else "",
+            output_text=_EXHAUSTED_MESSAGE[language],
+            model=last.model if last else "",
+            usage=last.usage if last else {},
+            tools_invoked=tuple(tools_invoked),
+            iterations=self._max_iterations,
+            exhausted=True,
         )
 
     def _finish(

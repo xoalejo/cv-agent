@@ -33,6 +33,11 @@ from openai import (
     RateLimitError,
 )
 
+from src.application.errors import (
+    LLMConfigurationError,
+    LLMEngineError,
+    LLMRateLimitError,
+)
 from src.application.ports import (
     EngineResponse,
     EngineStreamEvent,
@@ -43,38 +48,21 @@ from src.application.ports import (
 
 logger = logging.getLogger(__name__)
 
+#: Reexportados para quien ya importaba desde aquí. Su hogar es
+#: `src.application.errors`: son parte del contrato del puerto, no de este
+#: adaptador.
+__all__ = [
+    "DEFAULT_MAX_RETRIES",
+    "LLMConfigurationError",
+    "LLMEngineError",
+    "LLMRateLimitError",
+    "OpenAIResponsesEngine",
+]
+
 #: Reintentos automáticos del SDK ante 429 y errores de conexión, con espera
 #: exponencial. Absorbe los picos breves sin que el cliente se entere; los
 #: sostenidos sí escalan como 429 hacia arriba.
 DEFAULT_MAX_RETRIES = 3
-
-
-class LLMEngineError(RuntimeError):
-    """Fallo al hablar con el proveedor del modelo.
-
-    Se traduce a un error genérico en la respuesta HTTP: el detalle se queda en
-    los logs del servidor, no viaja al cliente.
-    """
-
-
-class LLMRateLimitError(LLMEngineError):
-    """El proveedor rechazó por cuota (RPM o TPM).
-
-    Es transitorio: reintentar más tarde tiene sentido, y por eso viaja al
-    cliente como 429 con `Retry-After` y no como un 502.
-    """
-
-    def __init__(self, message: str, *, retry_after: int = 20) -> None:
-        super().__init__(message)
-        self.retry_after = retry_after
-
-
-class LLMConfigurationError(LLMEngineError):
-    """Credencial inválida o modelo inexistente.
-
-    Reintentar no lo arregla: requiere corregir la configuración del servicio.
-    Se separa para que no se confunda con una indisponibilidad pasajera.
-    """
 
 
 def _retry_after_seconds(exc: Exception, *, default: int = 20) -> int:
@@ -124,10 +112,6 @@ class OpenAIResponsesEngine:
         self._client = OpenAI(api_key=api_key, timeout=timeout, max_retries=max_retries)
         self._model = model
         self._reasoning_effort = reasoning_effort
-
-    @property
-    def model(self) -> str:
-        return self._model
 
     def respond(
         self,

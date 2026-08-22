@@ -13,10 +13,26 @@ error.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypeVar
 
 Language = Literal["es", "en"]
+
+_T = TypeVar("_T")
+
+
+def _buscar(items: tuple[_T, ...], query: str, campo: Callable[[_T], str]) -> _T | None:
+    """Primera coincidencia por subcadena, sin distinguir mayúsculas.
+
+    La misma regla de tolerancia sirve para empresas, proyectos y categorías;
+    tenerla escrita una vez evita que mejorarla en un sitio la deje peor en los
+    otros dos.
+    """
+    needle = query.strip().lower()
+    if not needle:
+        return None
+    return next((item for item in items if needle in campo(item).lower()), None)
 
 
 @dataclass(frozen=True)
@@ -102,28 +118,10 @@ class Profile:
 
         Quien pregunta escribe "Abba" o "arbomex", no la razón social completa.
         """
-        needle = company_query.strip().lower()
-        if not needle:
-            return None
-        for experience in self.experiences:
-            if needle in experience.company.lower():
-                return experience
-        return None
+        return _buscar(self.experiences, company_query, lambda e: e.company)
 
     def find_project(self, name_query: str) -> Project | None:
-        needle = name_query.strip().lower()
-        if not needle:
-            return None
-        for project in self.projects:
-            if needle in project.name.lower():
-                return project
-        return None
+        return _buscar(self.projects, name_query, lambda p: p.name)
 
     def find_skill_category(self, category_query: str) -> SkillCategory | None:
-        needle = category_query.strip().lower()
-        if not needle:
-            return None
-        for category in self.skill_categories:
-            if needle in category.name.lower():
-                return category
-        return None
+        return _buscar(self.skill_categories, category_query, lambda c: c.name)

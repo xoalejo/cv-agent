@@ -146,6 +146,15 @@ class ToolRegistry:
             "get_tech_stack": self._get_tech_stack,
             "get_contact_info": self._get_contact_info,
         }
+        # Dos listas que deben coincidir: las definiciones que ve el modelo y los
+        # handlers que las ejecutan. Si divergen, el síntoma en producción sería
+        # un error de herramienta inexistente a mitad de una conversación; aquí
+        # falla al arrancar, que es donde se nota.
+        declaradas = {definition["name"] for definition in TOOL_DEFINITIONS}
+        if declaradas != self._handlers.keys():
+            raise ValueError(
+                f"Definiciones y handlers no coinciden: {declaradas ^ self._handlers.keys()}"
+            )
 
     @property
     def definitions(self) -> list[dict[str, Any]]:
@@ -184,9 +193,9 @@ class ToolRegistry:
                 {"text": fragment.text, "source": fragment.citation} for fragment in fragments
             ],
             "note": (
-                "Sin coincidencias: el CV no cubre ese tema."
-                if not fragments
-                else "Cada fragmento incluye su procedencia en 'source'."
+                "Cada fragmento incluye su procedencia en 'source'."
+                if fragments
+                else "Sin coincidencias: el CV no cubre ese tema."
             ),
         }
 
@@ -200,7 +209,7 @@ class ToolRegistry:
                 "role": experience.role,
                 "period": experience.period,
                 "company_description": experience.company_description,
-                "achievements": [a for a in experience.achievements],
+                "achievements": list(experience.achievements),
             }
 
         if company:

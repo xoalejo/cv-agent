@@ -23,8 +23,18 @@ from src.domain.policies import OUT_OF_SCOPE_TOPICS, allowed_contact_channels
 from src.domain.profile import Profile
 
 _MESES = (
-    "enero", "febrero", "marzo", "abril", "mayo", "junio",
-    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
 )
 
 _RULES = """\

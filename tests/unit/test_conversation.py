@@ -252,10 +252,9 @@ class TestLanguageDetectionWithCitations:
 
     def test_respuesta_en_ingles_que_cita_titulos_en_espanol(self) -> None:
         respuesta = (
-            "Yes. Oscar has **three patent applications pending before IMPI**: "
-            "- **Sistema de Gestión y Trazabilidad de Documentos mediante "
-            "Procesamiento de Lenguaje Natural (PLN) para el Transporte de Carga** "
-            "- File number: MX/a/2024/008296"
+            "Yes. Oscar founded the Digital Transformation area at **ABBA Networks**: "
+            "estructura, procesos y un equipo de 4+ personas, con el "
+            "**Tecnológico de Monterrey** como formación de respaldo."
         )
         assert detect_language(respuesta) == "en"
 

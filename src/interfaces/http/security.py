@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import os
 import threading
 import time
 from collections import deque
@@ -39,8 +40,6 @@ def entorno_efimero() -> str | None:
     creada, y un contador en memoria arranca vacío cada vez. Saberlo importa
     porque cambia lo que este límite protege de verdad.
     """
-    import os
-
     for variable, nombre in (
         ("VERCEL", "Vercel"),
         ("AWS_LAMBDA_FUNCTION_NAME", "AWS Lambda"),

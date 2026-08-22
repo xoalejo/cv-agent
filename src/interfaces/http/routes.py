@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.application.conversation import AnswerProfileQuestion
-from src.infrastructure.openai_engine import (
+from src.application.errors import (
     LLMConfigurationError,
     LLMEngineError,
     LLMRateLimitError,
@@ -18,11 +18,48 @@ from src.infrastructure.profile_data import StaticProfileRepository
 from src.interfaces.http.agent_card import build_agent_card
 from src.interfaces.http.schemas import ResponsesReply, ResponsesRequest
 from src.interfaces.http.security import authorize
-from src.interfaces.http.streaming import stream_error, stream_open_responses
+from src.interfaces.http.streaming import OpenResponsesStream
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+#: Traducción de un fallo del proveedor a la respuesta que ve el cliente.
+#:
+#: Vive en una tabla y no repartida en bloques `except` porque las dos rutas, la
+#: síncrona y la de streaming, deben comunicar lo mismo. Escritos por separado ya
+#: habían divergido: la de streaming perdía el `Retry-After`.
+#:
+#: El orden importa: las subclases primero, porque la traducción se resuelve con
+#: la primera coincidencia.
+_ERRORES: tuple[tuple[type[LLMEngineError], int, str], ...] = (
+    (
+        LLMRateLimitError,
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        "El proveedor del modelo alcanzó su límite de uso. Reintenta en unos segundos.",
+    ),
+    (
+        LLMConfigurationError,
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+        "El agente no está configurado correctamente.",
+    ),
+    (
+        LLMEngineError,
+        status.HTTP_502_BAD_GATEWAY,
+        "El modelo no está disponible en este momento. Intenta de nuevo.",
+    ),
+)
+
+
+def _traducir(exc: LLMEngineError) -> tuple[int, str]:
+    """Código y mensaje público para un fallo del proveedor.
+
+    El detalle real ya quedó en los logs del adaptador; lo que sale de aquí no
+    revela nada de la infraestructura.
+    """
+    return next(
+        (codigo, mensaje) for tipo, codigo, mensaje in _ERRORES if isinstance(exc, tipo)
+    )
 
 
 def get_use_case(request: Request) -> AnswerProfileQuestion:
@@ -81,28 +118,24 @@ def _streaming_response(
     """
     started = time.perf_counter()
 
+    # Se resuelven antes de abrir el generador para no retener el DTO completo,
+    # que puede pesar cientos de kilobytes, durante todo el flujo.
+    items = payload.as_input_items()
+    instrucciones = payload.instructions
+    emisor = OpenResponsesStream()
+
     def generador():
         try:
-            eventos = use_case.execute_stream(
-                payload.as_input_items(),
-                caller_instructions=payload.instructions,
+            yield from emisor.run(
+                use_case.execute_stream(items, caller_instructions=instrucciones)
             )
-            yield from stream_open_responses(eventos, fallback_model="")
-        except LLMRateLimitError:
-            yield from stream_error(
-                "El proveedor del modelo alcanzó su límite de uso. "
-                "Reintenta en unos segundos.",
-                code="429",
-            )
-        except LLMConfigurationError:
-            yield from stream_error(
-                "El agente no está configurado correctamente.", code="503"
-            )
-        except LLMEngineError:
-            yield from stream_error(
-                "El modelo no está disponible en este momento. Intenta de nuevo.",
-                code="502",
-            )
+        except LLMEngineError as exc:
+            codigo, mensaje = _traducir(exc)
+            if isinstance(exc, LLMRateLimitError):
+                # No hay cabecera que poner una vez abierto el flujo, así que la
+                # espera sugerida viaja dentro del mensaje.
+                mensaje = f"{mensaje} Reintenta en {exc.retry_after} segundos."
+            yield from emisor.failed(mensaje, code=str(codigo))
         finally:
             logger.info(
                 "turno completado (streaming)",
@@ -161,7 +194,7 @@ async def agent_card(request: Request) -> JSONResponse:
     tags=["agente"],
     dependencies=[Depends(authorize)],
 )
-async def create_response(
+def create_response(
     payload: ResponsesRequest,
     use_case: AnswerProfileQuestion = Depends(get_use_case),
 ) -> ResponsesReply | StreamingResponse:
@@ -169,6 +202,12 @@ async def create_response(
 
     El historial completo del hilo llega en `input`; el servicio no guarda estado
     entre peticiones.
+
+    **Definido con `def`, no con `async def`, a propósito.** El caso de uso es
+    síncrono de principio a fin y tarda segundos. FastAPI ejecuta los handlers
+    `async` en el bucle de eventos, así que uno bloqueante detendría todas las
+    demás peticiones de la instancia mientras dura el turno; los `def` van al
+    threadpool y no bloquean a nadie.
     """
     if payload.stream:
         return _streaming_response(payload, use_case)
@@ -179,30 +218,18 @@ async def create_response(
             payload.as_input_items(),
             caller_instructions=payload.instructions,
         )
-    except LLMRateLimitError as exc:
-        # Cuota del proveedor saturada. Es transitorio, así que se propaga como
-        # 429 con la espera sugerida: quien integra el agente puede reintentar
-        # con criterio en lugar de tratarlo como un servicio caído.
+    except LLMEngineError as exc:
+        codigo, mensaje = _traducir(exc)
         raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                "El proveedor del modelo alcanzó su límite de uso. Reintenta en unos segundos."
+            status_code=codigo,
+            detail=mensaje,
+            # La espera sugerida solo existe para el límite de cuota, y dársela al
+            # cliente es lo que le permite reintentar con criterio.
+            headers=(
+                {"Retry-After": str(exc.retry_after)}
+                if isinstance(exc, LLMRateLimitError)
+                else None
             ),
-            headers={"Retry-After": str(exc.retry_after)},
-        ) from None
-    except LLMConfigurationError:
-        # Credencial o modelo mal configurados: el servicio no puede responder
-        # hasta que se corrija. Se distingue de una caída pasajera.
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="El agente no está configurado correctamente.",
-        ) from None
-    except LLMEngineError:
-        # El detalle ya quedó en los logs del adaptador; al cliente le llega un
-        # error genérico para no filtrar interioridades del proveedor.
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="El modelo no está disponible en este momento. Intenta de nuevo.",
         ) from None
 
     elapsed_ms = round((time.perf_counter() - started) * 1000)

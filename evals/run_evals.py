@@ -25,6 +25,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.application.conversation import detect_language  # noqa: E402
+from src.config import get_settings  # noqa: E402
 from src.domain.policies import contains_contact_data  # noqa: E402
 
 #: El juez usa un nivel **superior** al del agente evaluado. Si juzgara el mismo
@@ -87,11 +89,15 @@ con el estilo: la redacción puede variar mientras el criterio se cumpla.
 class CaseResult:
     case_id: str
     category: str
-    passed: bool
     failures: list[str] = field(default_factory=list)
     answer: str = ""
     latency_ms: int = 0
     judge_reason: str = ""
+
+    @property
+    def passed(self) -> bool:
+        """Derivado, no almacenado: no puede desincronizarse de los fallos."""
+        return not self.failures
 
 
 class AgentClient:
@@ -179,18 +185,35 @@ def check_rules(answer: str, expect: dict[str, Any]) -> list[str]:
     return failures
 
 
+@lru_cache(maxsize=1)
+def _judge_client(api_key: str):
+    """Un cliente reutilizado para toda la suite.
+
+    Construir uno por caso abre un handshake TLS nuevo contra el proveedor en
+    cada veredicto: con treinta casos son treinta viajes de ida y vuelta que no
+    aportan nada.
+    """
+    from openai import OpenAI
+
+    return OpenAI(api_key=api_key, timeout=45.0)
+
+
 def run_judge(question: str, answer: str, rubric: str) -> tuple[bool, str]:
     """Evalúa con un modelo lo que una regla no puede comprobar."""
-    try:
-        from openai import OpenAI
-    except ImportError:  # pragma: no cover
+    import importlib.util
+
+    if importlib.util.find_spec("openai") is None:  # pragma: no cover
         return True, "juez omitido (falta el SDK de openai)"
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    # Vía `get_settings`, no `os.getenv`: este último no lee `.env`, así que con
+    # la clave solo en el archivo la suite pasaba en verde sin que el juez
+    # hubiera intervenido nunca. Un evaluador que se salta en silencio es peor
+    # que no tenerlo.
+    api_key = get_settings().openai_api_key
     if not api_key:
         return True, "juez omitido (falta OPENAI_API_KEY)"
 
-    client = OpenAI(api_key=api_key, timeout=45.0)
+    client = _judge_client(api_key)
     try:
         response = client.responses.create(
             model=JUDGE_MODEL,
@@ -217,12 +240,11 @@ def run_case(client: AgentClient, case: dict[str, Any], *, use_judge: bool) -> C
         return CaseResult(
             case_id=case_id,
             category=category,
-            passed=False,
             failures=[f"HTTP {exc.response.status_code}: {exc.response.text[:200]}"],
         )
     except httpx.HTTPError as exc:
         return CaseResult(
-            case_id=case_id, category=category, passed=False, failures=[f"red: {exc}"]
+            case_id=case_id, category=category, failures=[f"red: {exc}"]
         )
 
     failures = check_rules(answer, expect)
@@ -237,7 +259,6 @@ def run_case(client: AgentClient, case: dict[str, Any], *, use_judge: bool) -> C
     return CaseResult(
         case_id=case_id,
         category=category,
-        passed=not failures,
         failures=failures,
         answer=answer,
         latency_ms=latency,

@@ -26,7 +26,7 @@ from src.domain.profile import Profile
 _EXAMPLES = (
     "¿En qué empresas ha trabajado con RAG?",
     "¿Qué experiencia tiene en el sector financiero?",
-    "Cuéntame de sus patentes ante el IMPI",
+    "¿Qué reconocimientos ha recibido?",
     "What is his experience building AI agents?",
 )
 
@@ -43,13 +43,14 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
     # compromete y el que debería registrar una integración. La propia tarjeta
     # se sirve en la raíz, como exige la convención de `/.well-known/`.
     versioned = f"{base}/v1"
+    endpoint = f"{versioned}/responses"
 
     return {
         "protocolVersion": "1.0",
         "name": f"Agente de CV de {profile.full_name}",
         "description": (
             f"Conversa sobre la trayectoria profesional de {profile.full_name}: "
-            "experiencia, habilidades, proyectos, patentes y formación. "
+            "experiencia, habilidades, proyectos y formación. "
             "Responde en español o inglés según el idioma de la pregunta y "
             "mantiene la continuidad del hilo."
         ),
@@ -108,7 +109,7 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
                     "uri": "https://openresponses.org",
                     "description": "Endpoint compatible con Open Responses.",
                     "required": False,
-                    "params": {"baseUrl": versioned, "endpoint": f"{versioned}/responses"},
+                    "params": {"baseUrl": versioned, "endpoint": endpoint},
                 }
             ],
         },
@@ -130,20 +131,18 @@ def build_agent_card(profile: Profile, *, base_url: str) -> dict[str, Any]:
                 "name": "Trayectoria profesional",
                 "description": (
                     "Responde preguntas sobre experiencia laboral, stack técnico, "
-                    "proyectos, patentes, formación y reconocimientos, citando la "
+                    "proyectos, formación y reconocimientos, citando la "
                     "procedencia de cada dato dentro del CV."
                 ),
                 "tags": ["cv", "perfil profesional", "reclutamiento", "bilingüe"],
                 "examples": list(_EXAMPLES),
-                "inputModes": ["text/plain"],
-                "outputModes": ["text/plain"],
             }
         ],
         # Extensión no estándar: la plataforma pide la URL de Open Responses para
         # autocompletar su formulario, y el spec A2A no tiene un campo para eso.
         "openResponses": {
             "baseUrl": versioned,
-            "endpoint": f"{versioned}/responses",
+            "endpoint": endpoint,
             "conversationState": "replay_transcript",
             "authentication": "bearer",
         },

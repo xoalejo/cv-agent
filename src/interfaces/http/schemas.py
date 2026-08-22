@@ -44,9 +44,7 @@ def _tamano_de_item(item: dict[str, Any]) -> int:
         return len(contenido)
     if isinstance(contenido, list):
         return sum(
-            len(str(parte.get("text", "")))
-            for parte in contenido
-            if isinstance(parte, dict)
+            len(str(parte.get("text", ""))) for parte in contenido if isinstance(parte, dict)
         )
     # Formas no previstas: se mide el elemento completo para no dejar huecos.
     return len(str(item))

@@ -34,7 +34,7 @@ transversal, dato distintivo, impacto medible y bilingüismo.
 ```
 ¿En qué empresas ha trabajado con RAG?
 ¿Qué experiencia tiene en el sector financiero?
-Cuéntame de sus patentes ante el IMPI
+¿Qué reconocimientos ha recibido?
 ¿Qué logró en Arbomex y qué impacto tuvo en el negocio?
 What is his experience building AI agents?
 ```

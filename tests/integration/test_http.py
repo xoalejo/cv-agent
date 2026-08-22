@@ -616,3 +616,90 @@ class TestVersionado:
     def test_la_salud_responde_en_ambas(self, client: TestClient) -> None:
         for ruta in ("/health", "/v1/health"):
             assert client.get(ruta).status_code == 200, ruta
+
+
+class TestStreamingRegresiones:
+    """Defectos concretos detectados en revisión, con su prueba."""
+
+    def test_el_mensaje_conserva_un_solo_id(self, client: TestClient) -> None:
+        """El envoltorio final reutiliza el id del ítem, no genera otro.
+
+        Con dos ids, un cliente que correlacione por mensaje vería aparecer uno
+        distinto justo al cerrar el flujo.
+        """
+        eventos = _eventos_sse(
+            client.post(
+                "/responses", json={"input": "hola", "stream": True}, headers=AUTH
+            ).text
+        )
+
+        ids = set()
+        for e in eventos:
+            if "item_id" in e:
+                ids.add(e["item_id"])
+            if e.get("item", {}).get("id"):
+                ids.add(e["item"]["id"])
+            for mensaje in e.get("response", {}).get("output", []):
+                if mensaje.get("id"):
+                    ids.add(mensaje["id"])
+
+        assert len(ids) == 1, f"el mensaje viaja con varios ids: {ids}"
+
+    def test_un_fallo_a_mitad_no_reinicia_la_numeracion(self) -> None:
+        """El evento de error continúa la secuencia en lugar de volver a cero."""
+
+        class FallaTrasAbrir:
+            def respond_stream(self, **_: object):
+                raise LLMRateLimitError("cuota agotada", retry_after=7)
+                yield  # pragma: no cover - hace de esto un generador
+
+        app = create_app()
+        client = TestClient(app)
+        client.__enter__()
+        try:
+            repository = StaticProfileRepository()
+            app.state.answer_question = AnswerProfileQuestion(
+                engine=FallaTrasAbrir(),  # type: ignore[arg-type]
+                profile_repository=repository,
+                tools=ToolRegistry(repository, LexicalProfileSearch(repository.get())),
+            )
+
+            eventos = _eventos_sse(
+                client.post(
+                    "/responses", json={"input": "hola", "stream": True}, headers=AUTH
+                ).text
+            )
+            numeros = [e["sequence_number"] for e in eventos]
+
+            assert numeros == list(range(len(numeros))), f"numeración rota: {numeros}"
+            assert eventos[-1]["type"] == "response.failed"
+        finally:
+            client.__exit__(None, None, None)
+
+    def test_el_fallo_por_cuota_informa_la_espera(self) -> None:
+        """La rama de streaming no puede poner cabeceras: la espera va en el texto."""
+
+        class SinCuota:
+            def respond_stream(self, **_: object):
+                raise LLMRateLimitError("cuota agotada", retry_after=7)
+                yield  # pragma: no cover
+
+        app = create_app()
+        client = TestClient(app)
+        client.__enter__()
+        try:
+            repository = StaticProfileRepository()
+            app.state.answer_question = AnswerProfileQuestion(
+                engine=SinCuota(),  # type: ignore[arg-type]
+                profile_repository=repository,
+                tools=ToolRegistry(repository, LexicalProfileSearch(repository.get())),
+            )
+
+            cuerpo = client.post(
+                "/responses", json={"input": "hola", "stream": True}, headers=AUTH
+            ).text
+
+            assert "7 segundos" in cuerpo
+            assert "cuota agotada" not in cuerpo, "no debe filtrar el detalle interno"
+        finally:
+            client.__exit__(None, None, None)
