@@ -64,6 +64,7 @@ class OpenResponsesStream:
         self._item_id = f"msg_{uuid.uuid4().hex}"
         self._model = model
         self._chunks: list[str] = []
+        self._pending = ""
         self._usage: dict[str, int] = {}
 
     # -- serialización --------------------------------------------------------
@@ -117,9 +118,10 @@ class OpenResponsesStream:
                 # Si el turno terminó sin texto, por ejemplo al agotar las vueltas
                 # de herramientas, se emite el mensaje de cierre como un delta más
                 # para que el cliente no reciba un flujo vacío.
-                if not self._chunks and event.result.output_text:
+                if not self._chunks and not self._pending and event.result.output_text:
                     yield from self._delta(event.result.output_text)
 
+        yield from self._flush_pending()
         texto = "".join(self._chunks)
         yield self._event("response.output_text.done", **self._position, text=texto)
         yield self._event(
@@ -135,9 +137,25 @@ class OpenResponsesStream:
         )
         yield self.done()
 
+    #: Caracteres acumulados antes de emitir un evento de delta. El proveedor
+    #: entrega el texto en fragmentos de token (a veces 1-2 caracteres); reenviar
+    #: cada uno como su propio evento SSE multiplica por cientos el número de
+    #: eventos sin que la latencia por fragmento (milisegundos) sea perceptible,
+    #: y un cliente que renderice en cada evento lo siente como tartamudeo. Se
+    #: agrupan en bloques de este tamaño antes de salir a la red.
+    _COALESCE_CHARS = 40
+
     def _delta(self, text: str) -> Iterator[str]:
-        self._chunks.append(text)
-        yield self._event("response.output_text.delta", **self._position, delta=text)
+        self._pending += text
+        if len(self._pending) >= self._COALESCE_CHARS:
+            yield from self._flush_pending()
+
+    def _flush_pending(self) -> Iterator[str]:
+        if not self._pending:
+            return
+        texto, self._pending = self._pending, ""
+        self._chunks.append(texto)
+        yield self._event("response.output_text.delta", **self._position, delta=texto)
 
     def failed(self, message: str, *, code: str) -> Iterator[str]:
         """Comunica un fallo dentro del flujo y lo cierra según el protocolo.
