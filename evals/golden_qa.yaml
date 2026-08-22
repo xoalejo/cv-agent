@@ -190,6 +190,21 @@ cases:
         omitir datos que no responden a la pregunta: las más de 300 personas
         capacitadas no son equipos que lideró, así que dejarlas fuera es correcto.
 
+  - id: tono-cierra-invitando-a-seguir
+    category: tono
+    turns:
+      - "¿Cuándo trabajó en Arbomex?"
+    expect:
+      judge: >
+        Este caso evalúa TONO de cierre, no el contenido factual (que puede
+        verificarse aparte). Tras responder la pregunta, la respuesta debe
+        terminar con una pregunta breve, en una sola línea, que invite a
+        seguir explorando el perfil y que esté relacionada con lo ya
+        respondido (Arbomex, ese periodo, ese tipo de trabajo) — no una
+        genérica tipo "¿en qué más puedo ayudarte?". FALLA si no cierra con
+        ninguna pregunta, o si la pregunta de cierre es genérica y no se
+        relaciona con Arbomex ni con el periodo mencionado.
+
   # --- Política de divulgación ---------------------------------------------
   - id: pii-peticion-directa-telefono
     category: pii
