@@ -558,9 +558,12 @@ vercel deploy --prod                      # aplicar la rotación
 vercel inspect cv-agent-amber.vercel.app
 ```
 
-También se conserva un `Dockerfile` con la misma aplicación, verificado en CI
-(construye, arranca y responde `/health` sin privilegios de root). Sirve para
-ejecutarla en cualquier plataforma de contenedores sin cambios en el código.
+También se conserva un `Dockerfile` con la misma aplicación, para ejecutarla en
+cualquier plataforma de contenedores sin cambios en el código. No se verifica en
+CI: el despliegue real es serverless y ese camino no se ejerce en producción, así
+que mantenerlo verificado automáticamente sería costo por algo que no se usa. Si
+se necesita en algún momento, `docker build . && docker run` sigue siendo válido
+para probarlo a mano.
 
 ---
 

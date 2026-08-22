@@ -31,8 +31,9 @@ class Settings(BaseSettings):
     #: la pregunta no es "¿cuál es el mejor modelo?" sino "¿cuál es el más barato
     #: que supera la suite de evaluación?". Los casos de `pii`, `injection` y
     #: `honestidad` son los que discriminan: si el nivel elegido falla alguno, se
-    #: sube al siguiente. Verificar el identificador exacto con:
-    #:     python -c "from openai import OpenAI; [print(m.id) for m in OpenAI().models.list() if m.id.startswith('gpt-5')]"
+    #: sube al siguiente. Verificar el identificador exacto contra la API real:
+    #:     python -c "from openai import OpenAI as C; \
+    #:     [print(m.id) for m in C().models.list() if m.id.startswith('gpt-5')]"
     openai_model: str = Field(default="gpt-5.6-luna")
 
     #: Esfuerzo de razonamiento ("none", "low", "medium", "high", "xhigh", "max").
