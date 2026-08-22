@@ -35,13 +35,20 @@ class Settings(BaseSettings):
     #:     python scripts/check_model.py --list --prefix gpt-5
     openai_model: str = Field(default="gpt-5.6-luna")
 
-    #: Esfuerzo de razonamiento del modelo ("minimal", "low", "medium", "high").
+    #: Esfuerzo de razonamiento ("none", "low", "medium", "high", "xhigh", "max").
     #:
     #: Esta familia de modelos NO admite `temperature`: la API rechaza cualquier
-    #: valor distinto del predeterminado. El control disponible es este. Se usa
-    #: "low" porque la tarea es responder con datos que ya están en el contexto,
-    #: no resolver un problema: subir el esfuerzo añade latencia y costo sin
-    #: mejorar respuestas que no requieren deliberación.
+    #: valor distinto del predeterminado. El control disponible es este.
+    #:
+    #: Se usa "low" por medición, no por intuición. Se probó "none", que suprime
+    #: los tokens de razonamiento previos al texto, pero con el resto del sistema
+    #: ya optimizado la diferencia es de 0.06 s y a cambio el modelo sigue peor
+    #: las instrucciones matizadas: en las pruebas de tono adelantaba la mención
+    #: de lo que falta y omitía el impacto medible.
+    #:
+    #: La latencia percibida no venía del razonamiento sino de las vueltas extra
+    #: por herramientas; ese es el problema que se atacó. Ver
+    #: `scripts/bench_latency.py`.
     reasoning_effort: str = Field(default="low")
 
     request_timeout_seconds: float = Field(default=60.0)
