@@ -157,3 +157,20 @@ class TestCurrentDate:
 
         assert "No asumas que un puesto sigue vigente" in instructions
         assert "no es necesariamente el puesto actual" in instructions
+
+
+class TestTone:
+    """El agente representa la trayectoria; no audita el documento."""
+
+    def test_instruye_abrir_por_lo_que_si_consta(self, profile: Profile) -> None:
+        instructions = " ".join(build_instructions(profile).split())
+
+        assert "Empieza siempre por lo que sí hay" in instructions
+        assert "no auditas su CV" in instructions
+
+    def test_conserva_la_regla_de_fundamento(self, profile: Profile) -> None:
+        """El tono cambia desde dónde se responde, no qué se afirma."""
+        instructions = " ".join(build_instructions(profile).split())
+
+        assert "no cambia la regla de fundamento" in instructions
+        assert "Nunca inventes" in instructions

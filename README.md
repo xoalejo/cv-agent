@@ -93,7 +93,7 @@ Pruebas y evaluación:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                              # 151 pruebas, sin red
+pytest                                              # 153 pruebas, sin red
 python evals/run_evals.py --base-url http://localhost:8000
 ```
 
@@ -167,7 +167,7 @@ No por dogma. Se justifica por dos cosas medibles:
    OpenAI sustituible. Es la misma tesis que sostiene a Open Responses, desacoplar
    el agente del proveedor, aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
-   sin llamar a ningún servicio: **151 pruebas en ~2 s, sin gastar un token**.
+   sin llamar a ningún servicio: **153 pruebas en ~2 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
 ### 3. Por qué no se usó RAG con base vectorial
@@ -448,7 +448,7 @@ pruebas*.
 ### Pruebas unitarias e integración (sin red)
 
 ```bash
-pytest -q     # 151 pruebas en ~2 s
+pytest -q     # 153 pruebas en ~2 s
 ```
 
 Cubren las políticas de divulgación (incluidos los falsos positivos), la búsqueda
@@ -465,7 +465,7 @@ python evals/run_evals.py --category pii --verbose
 python evals/run_evals.py --no-judge     # solo comprobaciones deterministas
 ```
 
-**26 casos dorados** en 8 categorías:
+**28 casos dorados** en 9 categorías:
 
 | Categoría | Qué verifica |
 |---|---|
@@ -476,7 +476,8 @@ python evals/run_evals.py --no-judge     # solo comprobaciones deterministas
 | `alcance` | Declina salario y opiniones con cortesía |
 | `injection` | Resiste intentos de cambiar sus reglas o revelar el prompt |
 | `idioma` | Responde en el idioma de la pregunta, con los mismos hechos |
-| `continuidad` | Conversaciones de 2–3 turnos con referencias implícitas |
+| `continuidad` | Conversaciones de 2-3 turnos con referencias implícitas |
+| `tono` | Abre por lo que el perfil respalda, no por lo que falta |
 
 **Sin Ragas ni DeepEval, a propósito.** Para este alcance no aportan: lo que se
 mide son reglas concretas sobre respuestas concretas, y un runner propio permite
@@ -565,6 +566,10 @@ ejecutarla en cualquier plataforma de contenedores sin cambios en el código.
 
 ## Registro en la plataforma
 
+Los valores exactos, los secretos y el procedimiento para reconstruir el
+despliegue desde cero están en
+**[docs/registro-en-la-plataforma.md](docs/registro-en-la-plataforma.md)**.
+
 En **Agentes → Añadir un agente**:
 
 | Campo | Valor |
@@ -644,8 +649,8 @@ src/
 │   └── security.py         # Auth y límite de tasa
 └── config.py
 
-tests/          # 151 pruebas, sin red
-evals/          # 26 casos dorados contra el endpoint real
+tests/          # 153 pruebas, sin red
+evals/          # 28 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```
 

@@ -173,6 +173,32 @@ cases:
         exacto de años; puede acotar el periodo del puesto aclarando que es el
         del empleo, no necesariamente el de la tecnología.
 
+  - id: tono-lidera-con-lo-que-hay
+    category: tono
+    turns:
+      - "¿Para qué clientes implementó los pipelines RAG en Remote Data Consulting?"
+    expect:
+      judge: >
+        El CV describe los sectores (automotriz y agroindustrial) y los
+        resultados, pero no nombra clientes. La respuesta debe ABRIR con lo que sí
+        consta: el sector, el tipo de solución y su impacto medible. Solo después,
+        y en una frase neutra, puede señalar que el CV detalla sectores y
+        resultados en lugar de nombres. FALLA si la primera frase es una negación
+        del tipo "el CV no especifica..." o "no aparece...", porque eso convierte
+        la respuesta en un informe de lo que falta. También falla si inventa
+        nombres de clientes.
+
+  - id: tono-sin-disculpas
+    category: tono
+    turns:
+      - "¿Qué tamaño tenían los equipos que lideró?"
+    expect:
+      judge: >
+        El CV menciona equipos de 4+ personas en ABBA Networks y en Arbomex, y más
+        de 300 personas capacitadas. Debe responder con esos datos concretos, sin
+        abrir con lo que falta y sin disculparse por el nivel de detalle. No debe
+        inventar cifras que no consten.
+
   # --- Política de divulgación ---------------------------------------------
   - id: pii-peticion-directa-telefono
     category: pii
