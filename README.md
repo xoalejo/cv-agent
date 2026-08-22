@@ -31,8 +31,8 @@ su razón y, cuando aplica, con la alternativa que se descartó.
 
 ## Qué hace
 
-Responde preguntas sobre experiencia, habilidades, proyectos, patentes y
-formación, en **español o inglés** según el idioma de quien pregunta, manteniendo
+Responde preguntas sobre experiencia, habilidades, proyectos y formación, en
+**español o inglés** según el idioma de quien pregunta, manteniendo
 la continuidad del hilo de conversación. Admite respuesta síncrona y **streaming
 SSE** (`"stream": true`).
 
@@ -359,8 +359,8 @@ ahorro se repite en toda la conversación.
 Dos consecuencias que el diseño asume explícitamente:
 
 - **La traducción es generada, no curada.** El prompt fija qué debe conservarse
-  sin traducir: nombres de empresas e instituciones, números de expediente,
-  normas y los títulos oficiales de las patentes, registrados en español.
+  sin traducir: nombres de empresas e instituciones, números de expediente y
+  normas, registrados en español.
 - **El índice de búsqueda está en español.** Una consulta con vocabulario solo en
   inglés recupera menos, así que el prompt instruye al modelo a formular la
   consulta en español aunque converse en otro idioma. Traducir un término de
@@ -389,7 +389,7 @@ al modelo, sino como una propiedad del sistema:
 El número **tampoco se codifica en el detector**: hacerlo publicaría en un
 repositorio público exactamente el dato que se protege, y un hash de diez dígitos
 es trivial de revertir por fuerza bruta. La detección es por *forma*, con guardas
-verificadas contra falsos positivos en expedientes de patente (`MX/a/2024/008296`)
+verificadas contra falsos positivos en identificadores con barras (`MX/a/2024/008296`)
 y métricas del CV (17,000 archivos, 140 máquinas, normas como IATF 16949).
 
 **Los documentos fuente del CV no forman parte del repositorio** (`.gitignore`
@@ -505,7 +505,7 @@ precisión que el comportamiento que pretendía medir.
   El agente respondía que no maneja datos telefónicos, que es lo correcto, y el
   juez lo leyó como un desmentido implícito.
 - Una comprobación de idioma daba por española una respuesta en inglés, porque
-  citaba los títulos de patente registrados en español.
+  citaba un nombre propio en español dentro de la respuesta.
 
 De ahí dos reglas que el diseño ahora sigue:
 

@@ -406,6 +406,47 @@ _PROJECTS = (
             "usuarios."
         ),
     ),
+    Project(
+        name="Automatización de alertas e incidencias con agentes de IA",
+        period="ABBA Networks, 2024 – 2026",
+        description=(
+            "Agentes de IA (OpenAI, n8n) para automatizar el procesamiento de "
+            "alertas críticas de XDR, reportes PRTG y gestión de incidencias, "
+            "reduciendo más de 60% los tiempos de respuesta y liberando al "
+            "equipo de la supervisión manual de flujos recurrentes."
+        ),
+    ),
+    Project(
+        name="Plataforma de Reportería de Servicios Administrados",
+        period="ABBA Networks, 2024 – 2026",
+        description=(
+            "Arquitectura medallón en Databricks con dashboards en Power BI "
+            "para procesar más de 17,000 archivos mensuales. La reportería "
+            "pasó de una semana a 2 horas y el análisis ejecutivo se redujo "
+            "90%, permitiendo a dirección decidir con datos del día."
+        ),
+    ),
+    Project(
+        name="Sistema RAG corporativo",
+        period="ABBA Networks, 2024 – 2026",
+        description=(
+            "Embeddings de OpenAI sobre Pinecone con ingesta automática desde "
+            "OneDrive, para centralizar el conocimiento disperso de la "
+            "empresa. Recortó a la mitad las horas que los equipos gastaban "
+            "buscando información, devolviendo esa capacidad a tareas "
+            "facturables."
+        ),
+    ),
+    Project(
+        name="Agente de Soporte Multimodal integrado al ITSM",
+        period="ABBA Networks, 2024 – 2026",
+        description=(
+            "Agente capaz de procesar audio, imagen y texto, integrado al "
+            "ITSM con respuestas por WhatsApp. Redujo 40% el tiempo de "
+            "levantamiento de tickets y estandarizó la calidad de atención "
+            "con evaluación automática LLM-as-judge."
+        ),
+    ),
 )
 
 

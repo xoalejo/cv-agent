@@ -93,8 +93,10 @@ class TestExecution:
     def test_proyectos(self, tools: ToolRegistry) -> None:
         result = tools.execute("get_projects", "{}")["result"]
 
-        assert len(result) == 1
-        assert "Multi-Agente" in result[0]["name"]
+        nombres = [proyecto["name"] for proyecto in result]
+        assert len(nombres) >= 5
+        assert any("Multi-Agente" in nombre for nombre in nombres)
+        assert any("RAG" in nombre for nombre in nombres)
 
     def test_busqueda_devuelve_procedencia(self, tools: ToolRegistry) -> None:
         result = tools.execute("search_profile", json.dumps({"query": "Pinecone"}))["result"]
