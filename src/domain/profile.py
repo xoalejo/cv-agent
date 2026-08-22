@@ -56,19 +56,6 @@ class Certification:
 
 
 @dataclass(frozen=True)
-class Patent:
-    """Patente en trámite ante el IMPI.
-
-    Los títulos son los oficiales registrados en español; al responder en otro
-    idioma se traducen como cortesía, pero el título registrado es este.
-    """
-
-    title: str
-    file_number: str
-    status: str
-
-
-@dataclass(frozen=True)
 class Project:
     name: str
     period: str
@@ -107,7 +94,6 @@ class Profile:
     languages: tuple[LanguageSkill, ...]
     skill_categories: tuple[SkillCategory, ...]
     certifications: tuple[Certification, ...]
-    patents: tuple[Patent, ...]
     projects: tuple[Project, ...]
     recognitions: tuple[Recognition, ...]
 

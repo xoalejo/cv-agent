@@ -127,10 +127,6 @@ class LexicalProfileSearch:
             text = f"{certification.name}, {certification.issuer} ({certification.year})."
             entries.append(cls._entry(text, Section.CERTIFICATIONS, certification.issuer))
 
-        for patent in profile.patents:
-            text = f"{patent.title} Expediente IMPI {patent.file_number}. {patent.status}."
-            entries.append(cls._entry(text, Section.PATENTS, patent.file_number))
-
         for project in profile.projects:
             text = f"{project.name} ({project.period}). {project.description}"
             entries.append(cls._entry(text, Section.PROJECTS, project.name))

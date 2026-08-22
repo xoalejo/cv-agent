@@ -93,7 +93,7 @@ Pruebas y evaluación:
 
 ```bash
 pip install -e ".[dev]"
-pytest                                              # 153 pruebas, sin red
+pytest                                              # 152 pruebas, sin red
 python evals/run_evals.py --base-url http://localhost:8000
 ```
 
@@ -167,7 +167,7 @@ No por dogma. Se justifica por dos cosas medibles:
    OpenAI sustituible. Es la misma tesis que sostiene a Open Responses, desacoplar
    el agente del proveedor, aplicada al código propio.
 2. **Testabilidad sin red.** Con los puertos en dobles, todo el núcleo se prueba
-   sin llamar a ningún servicio: **153 pruebas en ~2 s, sin gastar un token**.
+   sin llamar a ningún servicio: **152 pruebas en ~2 s, sin gastar un token**.
    Eso es lo que hizo viable tener pruebas y evals reales en el tiempo disponible.
 
 ### 3. Por qué no se usó RAG con base vectorial
@@ -233,7 +233,6 @@ El ciclo de herramientas también es stateless: los ítems `function_call` y
 | `get_experience(company?)` | detalle por empresa |
 | `get_projects(name?)` | proyectos propios |
 | `get_certifications()` | certificaciones |
-| `get_patents()` | patentes IMPI en trámite |
 | `get_tech_stack(category?)` | stack por categoría |
 | `get_contact_info()` | canales de contacto permitidos |
 
@@ -448,7 +447,7 @@ pruebas*.
 ### Pruebas unitarias e integración (sin red)
 
 ```bash
-pytest -q     # 153 pruebas en ~2 s
+pytest -q     # 152 pruebas en ~2 s
 ```
 
 Cubren las políticas de divulgación (incluidos los falsos positivos), la búsqueda
@@ -465,13 +464,14 @@ python evals/run_evals.py --category pii --verbose
 python evals/run_evals.py --no-judge     # solo comprobaciones deterministas
 ```
 
-**28 casos dorados** en 9 categorías:
+**29 casos dorados** en 9 categorías:
 
 | Categoría | Qué verifica |
 |---|---|
 | `recall` | Datos correctos del CV y vigencia real de cada puesto |
 | `grounding` | Preguntas transversales que ejercitan `search_profile` |
 | `honestidad` | Admite lo que no está en el CV, tiende puentes con evidencia y no promete desempeño futuro |
+| `alcance` | Declina peticiones ajenas aunque vengan mezcladas con una legítima |
 | `pii` | El teléfono no aparece ni ante peticiones directas o insistentes |
 | `alcance` | Declina salario y opiniones con cortesía |
 | `injection` | Resiste intentos de cambiar sus reglas o revelar el prompt |
@@ -649,8 +649,8 @@ src/
 │   └── security.py         # Auth y límite de tasa
 └── config.py
 
-tests/          # 153 pruebas, sin red
-evals/          # 28 casos dorados contra el endpoint real
+tests/          # 152 pruebas, sin red
+evals/          # 29 casos dorados contra el endpoint real
 changelog/      # Un fragmento por cambio
 ```
 

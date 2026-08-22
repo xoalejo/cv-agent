@@ -17,11 +17,39 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-#: Cota defensiva sobre el historial que acepta un turno. La plataforma reenvía
+#: Cotas defensivas sobre el historial que acepta un turno. La plataforma reenvía
 #: la transcripción completa en cada llamada, así que sin un tope el tamaño del
 #: contexto, y su costo, crece con la conversación sin límite.
 MAX_INPUT_ITEMS = 200
 MAX_TEXT_LENGTH = 32_000
+
+#: Tope sobre el **tamaño total** del historial, no solo sobre su número de
+#: elementos. Sin él, doscientos elementos de veinte kilobytes cada uno pasan la
+#: validación y llegan al proveedor como un millón de tokens en una sola
+#: petición: quien tenga la credencial puede agotar el presupuesto sin esfuerzo.
+#:
+#: El valor es holgado a propósito. Son unos 50.000 tokens, más de diez veces el
+#: prompt del sistema, así que una conversación larga cabe de sobra; lo que no
+#: cabe es una carga construida para gastar.
+#:
+#: No se delega en el límite de cuerpo del hosting: existe en Vercel, pero es un
+#: control accidental que desaparecería al migrar a un contenedor.
+MAX_TOTAL_INPUT_CHARS = 200_000
+
+
+def _tamano_de_item(item: dict[str, Any]) -> int:
+    """Caracteres de texto que aporta un elemento del historial."""
+    contenido = item.get("content")
+    if isinstance(contenido, str):
+        return len(contenido)
+    if isinstance(contenido, list):
+        return sum(
+            len(str(parte.get("text", "")))
+            for parte in contenido
+            if isinstance(parte, dict)
+        )
+    # Formas no previstas: se mide el elemento completo para no dejar huecos.
+    return len(str(item))
 
 
 class ResponsesRequest(BaseModel):
@@ -54,9 +82,17 @@ class ResponsesRequest(BaseModel):
             raise ValueError("El campo 'input' no puede ser una lista vacía.")
         if len(value) > MAX_INPUT_ITEMS:
             raise ValueError(f"El historial excede el máximo de {MAX_INPUT_ITEMS} elementos.")
+
+        total = 0
         for item in value:
             if not isinstance(item, dict):
                 raise ValueError("Cada elemento de 'input' debe ser un objeto.")
+            total += _tamano_de_item(item)
+            if total > MAX_TOTAL_INPUT_CHARS:
+                raise ValueError(
+                    "El historial excede el tamaño máximo de "
+                    f"{MAX_TOTAL_INPUT_CHARS:,} caracteres."
+                )
         return value
 
     def as_input_items(self) -> list[dict[str, Any]]:

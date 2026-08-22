@@ -24,6 +24,7 @@ from src.infrastructure.openai_engine import OpenAIResponsesEngine
 from src.infrastructure.profile_data import StaticProfileRepository
 from src.interfaces.http.routes import router
 from src.interfaces.http.schemas import ErrorDetail, ErrorReply
+from src.interfaces.http.security import advertir_si_es_inefectivo
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,8 @@ async def lifespan(app: FastAPI):
         # otro entorno, que quede constancia ruidosa en los logs.
         logger.warning("Servicio sin autenticación: define AGENT_API_KEY antes de exponerlo.")
 
+    advertir_si_es_inefectivo(settings)
+
     try:
         app.state.answer_question = build_use_case(settings)
         logger.info("Agente listo (modelo=%s)", settings.openai_model)
@@ -75,6 +78,12 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
 
+    # La documentación interactiva y el esquema OpenAPI describen rutas, modelos
+    # y validaciones. No contienen secretos, pero publicarlos regala trabajo de
+    # reconocimiento sobre una API que exige credencial. Se sirven solo fuera de
+    # producción, donde son útiles para desarrollar.
+    en_produccion = settings.environment.lower() == "production"
+
     app = FastAPI(
         title="CV Agent",
         description=(
@@ -83,6 +92,9 @@ def create_app() -> FastAPI:
         ),
         version="1.0.0",
         lifespan=lifespan,
+        docs_url=None if en_produccion else "/docs",
+        redoc_url=None if en_produccion else "/redoc",
+        openapi_url=None if en_produccion else "/openapi.json",
     )
 
     # Integración servidor-a-servidor: sin orígenes de navegador salvo que se

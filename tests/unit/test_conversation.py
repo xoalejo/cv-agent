@@ -58,7 +58,7 @@ class TestDirectAnswer:
         instructions = engine.calls[0]["instructions"]
         assert "ABBA Networks" in instructions
         assert "EGADE Business School" in instructions
-        assert "MX/a/2024/008296" in instructions
+        assert "13365841" in instructions
 
     def test_las_herramientas_se_ofrecen_al_modelo(
         self, tools: ToolRegistry, profile_repository: StaticProfileRepository
@@ -70,7 +70,7 @@ class TestDirectAnswer:
 
         offered = {tool["name"] for tool in engine.calls[0]["tools"]}
         assert "search_profile" in offered
-        assert len(offered) == 7
+        assert len(offered) == 6
 
 
 class TestToolLoop:
@@ -101,10 +101,12 @@ class TestToolLoop:
         self, tools: ToolRegistry, profile_repository: StaticProfileRepository
     ) -> None:
         """Los ítems del modelo vuelven al input junto con el resultado."""
-        engine = FakeEngine([tool_response("get_patents"), text_response("Tiene 3 patentes.")])
+        engine = FakeEngine(
+            [tool_response("get_certifications"), text_response("Tiene 4 certificaciones.")]
+        )
         use_case = build_use_case(engine, tools, profile_repository)
 
-        use_case.execute([user_message("¿Patentes?")])
+        use_case.execute([user_message("¿Certificaciones?")])
 
         second_input = engine.calls[1]["input_items"]
         calls = [i for i in second_input if i.get("type") == "function_call"]
@@ -131,10 +133,10 @@ class TestToolLoop:
         self, tools: ToolRegistry, profile_repository: StaticProfileRepository
     ) -> None:
         """Un modelo que insiste en llamar herramientas no gasta sin límite."""
-        engine = FakeEngine([tool_response("get_patents") for _ in range(10)])
+        engine = FakeEngine([tool_response("get_certifications") for _ in range(10)])
         use_case = build_use_case(engine, tools, profile_repository, max_tool_iterations=3)
 
-        result = use_case.execute([user_message("¿Patentes?")])
+        result = use_case.execute([user_message("¿Certificaciones?")])
 
         assert result.exhausted is True
         assert result.iterations == 3
@@ -188,10 +190,12 @@ class TestStatelessness:
     def test_no_muta_el_historial_recibido(
         self, tools: ToolRegistry, profile_repository: StaticProfileRepository
     ) -> None:
-        engine = FakeEngine([tool_response("get_patents"), text_response("Tres patentes.")])
+        engine = FakeEngine(
+            [tool_response("get_certifications"), text_response("Cuatro certificaciones.")]
+        )
         use_case = build_use_case(engine, tools, profile_repository)
 
-        history = [user_message("¿Patentes?")]
+        history = [user_message("¿Certificaciones?")]
         use_case.execute(history)
 
         assert len(history) == 1, "el input del cliente no debe mutarse"

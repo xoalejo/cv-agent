@@ -32,13 +32,42 @@ def _client_fingerprint(request: Request, credential: str | None) -> str:
     return f"ip:{client.host}" if client else "ip:unknown"
 
 
+def entorno_efimero() -> str | None:
+    """Nombre del entorno serverless detectado, si lo hay.
+
+    En un entorno efímero cada petición puede caer en una instancia recién
+    creada, y un contador en memoria arranca vacío cada vez. Saberlo importa
+    porque cambia lo que este límite protege de verdad.
+    """
+    import os
+
+    for variable, nombre in (
+        ("VERCEL", "Vercel"),
+        ("AWS_LAMBDA_FUNCTION_NAME", "AWS Lambda"),
+        ("FUNCTIONS_WORKER_RUNTIME", "Azure Functions"),
+        ("K_SERVICE", "Cloud Run"),
+    ):
+        if os.getenv(variable):
+            return nombre
+    return None
+
+
 class SlidingWindowRateLimiter:
     """Ventana deslizante en memoria.
 
-    Limitación conocida y declarada: el estado vive en el proceso, así que con
-    varias instancias el límite es por instancia, no global. Para el alcance de
-    este servicio es suficiente y evita añadir Redis como dependencia que operar.
-    Se documenta en el README en lugar de presentarlo como resuelto.
+    **Alcance real del control.** El estado vive en el proceso. En un servidor de
+    larga vida el límite es global y efectivo; en un entorno efímero cada
+    invocación puede estrenar instancia, y entonces protege poco más que de una
+    ráfaga que caiga en la misma máquina caliente.
+
+    No se disimula: `advertir_si_es_inefectivo` lo deja registrado al arrancar, y
+    el README lo declara. La protección real del endpoint es la credencial, y el
+    costo por petición está acotado por el tope de tamaño de entrada.
+
+    Hacerlo global exige un almacén compartido (Redis o equivalente). Es un
+    servicio más que desplegar y operar, y para el alcance de este agente la
+    decisión fue no añadirlo; el `check` queda aislado para que sustituirlo sea
+    cambiar esta clase, no el resto del sistema.
     """
 
     def __init__(self, *, max_requests: int, window_seconds: int) -> None:
@@ -87,6 +116,22 @@ def reset_rate_limiter() -> None:
     """Reinicia el limitador. Solo para pruebas."""
     global _limiter
     _limiter = None
+
+
+def advertir_si_es_inefectivo(settings: Settings) -> str | None:
+    """Registra qué protege el límite en el entorno actual, sin adornos."""
+    entorno = entorno_efimero()
+    if entorno is None:
+        return None
+
+    mensaje = (
+        f"Límite de tasa por instancia: en {entorno} el contador no se comparte "
+        f"entre invocaciones, así que el tope de {settings.rate_limit_requests}/"
+        f"{settings.rate_limit_window_seconds}s no aplica de forma global. La "
+        "protección efectiva es la credencial y el tope de tamaño de entrada."
+    )
+    logger.warning(mensaje)
+    return mensaje
 
 
 def _extract_bearer(authorization: str | None) -> str | None:

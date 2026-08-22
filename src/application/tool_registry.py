@@ -100,19 +100,6 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "type": "function",
-        "name": "get_patents",
-        "description": (
-            "Devuelve las patentes en trámite ante el IMPI, con número de expediente y "
-            "estado del trámite."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-    },
-    {
-        "type": "function",
         "name": "get_tech_stack",
         "description": (
             "Devuelve el stack técnico agrupado por categoría (IA & Agentes, Cloud & "
@@ -156,7 +143,6 @@ class ToolRegistry:
             "get_experience": self._get_experience,
             "get_projects": self._get_projects,
             "get_certifications": self._get_certifications,
-            "get_patents": self._get_patents,
             "get_tech_stack": self._get_tech_stack,
             "get_contact_info": self._get_contact_info,
         }
@@ -261,23 +247,6 @@ class ToolRegistry:
             }
             for certification in profile.certifications
         ]
-
-    @staticmethod
-    def _get_patents(profile: Profile, arguments: dict[str, Any]) -> Any:
-        return {
-            "note": (
-                "Patentes en trámite ante el IMPI. Los títulos oficiales están "
-                "registrados en español."
-            ),
-            "patents": [
-                {
-                    "title": patent.title,
-                    "file_number": patent.file_number,
-                    "status": patent.status,
-                }
-                for patent in profile.patents
-            ],
-        }
 
     @staticmethod
     def _get_tech_stack(profile: Profile, arguments: dict[str, Any]) -> Any:

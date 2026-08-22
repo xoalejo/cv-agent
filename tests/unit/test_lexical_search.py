@@ -52,9 +52,9 @@ class TestRecall:
         assert con_acento
         assert {r.text for r in con_acento} == {r.text for r in sin_acento}
 
-    def test_encuentra_patentes(self, search: LexicalProfileSearch) -> None:
-        results = search.search("patentes blockchain biométrica", limit=3)
-        assert any(r.section is Section.PATENTS for r in results)
+    def test_encuentra_la_formacion(self, search: LexicalProfileSearch) -> None:
+        results = search.search("MBA EGADE maestría", limit=3)
+        assert any(r.section is Section.EDUCATION for r in results)
 
 
 class TestProvenance:

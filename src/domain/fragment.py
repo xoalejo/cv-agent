@@ -20,7 +20,6 @@ class Section(StrEnum):
     EDUCATION = "formacion"
     SKILLS = "stack"
     CERTIFICATIONS = "certificaciones"
-    PATENTS = "patentes"
     PROJECTS = "proyectos"
     RECOGNITIONS = "reconocimientos"
     LANGUAGES = "idiomas"

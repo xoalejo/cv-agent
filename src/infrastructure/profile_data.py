@@ -22,7 +22,6 @@ from src.domain.profile import (
     Education,
     Experience,
     LanguageSkill,
-    Patent,
     Profile,
     Project,
     Recognition,
@@ -214,12 +213,15 @@ _EXPERIENCES = (
 
 _EDUCATION = (
     Education(
-        degree="Maestría en Dirección y Administración de Empresas (MBA)",
+        degree=(
+            "Maestría en Dirección y Administración de Empresas (MBA). "
+            "Cédula profesional 13365841."
+        ),
         institution="EGADE Business School, Tecnológico de Monterrey",
         period="2020 – 2022",
     ),
     Education(
-        degree="Ingeniería en Robótica",
+        degree="Ingeniería en Robótica. Cédula profesional 8266838.",
         institution="Universidad Politécnica de Guanajuato",
         period="2008 – 2012",
     ),
@@ -386,36 +388,6 @@ _CERTIFICATIONS = (
 )
 
 
-# Títulos oficiales registrados ante el IMPI, en español.
-_PATENTS = (
-    Patent(
-        title=(
-            "Sistema de Gestión y Trazabilidad de Documentos mediante "
-            "Procesamiento de Lenguaje Natural (PLN) para el Transporte de "
-            "Carga"
-        ),
-        file_number="MX/a/2024/008296",
-        status="Examen de forma aprobado: julio 2024",
-    ),
-    Patent(
-        title=(
-            "Sistema y Método para la Gestión de Transacciones Logísticas con "
-            "Procesamiento Automático de Pagos mediante Contratos Inteligentes"
-        ),
-        file_number="MX/a/2024/016163",
-        status="Examen de forma aprobado: enero 2025",
-    ),
-    Patent(
-        title=(
-            "Sistema y Método de Certificación y Autenticación Biométrica para "
-            "Documentos Logísticos con Registro en Cadena de Bloques"
-        ),
-        file_number="MX/a/2024/016162",
-        status="Examen de forma aprobado: enero 2025",
-    ),
-)
-
-
 _PROJECTS = (
     Project(
         name="Sistema Multi-Agente con Mejora Autónoma",
@@ -468,7 +440,7 @@ _RECOGNITIONS = (
 
 
 PROFILE = Profile(
-    full_name="Oscar Alejo",
+    full_name="Oscar Antonio Alejo Gámez",
     headline="AI & Data Engineer | Arquitectura de Sistemas | Transformación Digital",
     location="Celaya, Guanajuato, México",
     years_of_experience=15,
@@ -495,7 +467,6 @@ PROFILE = Profile(
     languages=_LANGUAGES,
     skill_categories=_SKILL_CATEGORIES,
     certifications=_CERTIFICATIONS,
-    patents=_PATENTS,
     projects=_PROJECTS,
     recognitions=_RECOGNITIONS,
 )

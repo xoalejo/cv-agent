@@ -99,8 +99,8 @@ class TestProfileDataHygiene:
         blobs: list[str] = [profile.summary, profile.headline]
         for experience in profile.experiences:
             blobs.extend(experience.achievements)
-        for patent in profile.patents:
-            blobs.append(f"{patent.title} {patent.file_number}")
+        for education in profile.education:
+            blobs.append(education.degree)
         for channel in profile.contact_channels:
             blobs.append(channel.value)
 

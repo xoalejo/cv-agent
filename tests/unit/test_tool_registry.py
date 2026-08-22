@@ -13,14 +13,13 @@ from src.application.tool_registry import TOOL_DEFINITIONS, ToolRegistry
 
 
 class TestDefinitions:
-    def test_expone_las_siete_herramientas(self) -> None:
+    def test_expone_las_seis_herramientas(self) -> None:
         names = {definition["name"] for definition in TOOL_DEFINITIONS}
         assert names == {
             "search_profile",
             "get_experience",
             "get_projects",
             "get_certifications",
-            "get_patents",
             "get_tech_stack",
             "get_contact_info",
         }
@@ -78,16 +77,6 @@ class TestExecution:
         # El error incluye las opciones válidas para que el modelo se corrija.
         assert len(result["available"]) == 3
 
-    def test_patentes(self, tools: ToolRegistry) -> None:
-        result = tools.execute("get_patents", "{}")["result"]
-
-        assert len(result["patents"]) == 3
-        assert {p["file_number"] for p in result["patents"]} == {
-            "MX/a/2024/008296",
-            "MX/a/2024/016163",
-            "MX/a/2024/016162",
-        }
-
     def test_certificaciones(self, tools: ToolRegistry) -> None:
         result = tools.execute("get_certifications", "{}")["result"]
         names = {c["name"] for c in result}
@@ -139,7 +128,6 @@ class TestContactPolicy:
             tools.execute("get_experience", "{}"),
             tools.execute("get_projects", "{}"),
             tools.execute("get_certifications", "{}"),
-            tools.execute("get_patents", "{}"),
             tools.execute("get_tech_stack", "{}"),
             tools.execute("get_contact_info", "{}"),
             tools.execute("search_profile", json.dumps({"query": "contacto teléfono"})),
@@ -171,7 +159,6 @@ class TestErrorHandling:
             "get_experience",
             "get_projects",
             "get_certifications",
-            "get_patents",
             "get_tech_stack",
             "get_contact_info",
         ):

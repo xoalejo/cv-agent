@@ -20,12 +20,12 @@ class TestProfileGrounding:
         for company in ("ABBA Networks", "Remote Data Consulting", "Arbomex"):
             assert company in instructions
 
-    def test_incluye_formacion_certificaciones_y_patentes(self, profile: Profile) -> None:
+    def test_incluye_formacion_y_certificaciones(self, profile: Profile) -> None:
         instructions = build_instructions(profile)
 
         assert "EGADE Business School" in instructions
         assert "Certified ScrumMaster" in instructions
-        assert "MX/a/2024/016162" in instructions
+        assert "13365841" in instructions
 
     def test_el_perfil_aparece_una_sola_vez(self, profile: Profile) -> None:
         """Sin copia traducida no hay forma de que las dos versiones divergan."""

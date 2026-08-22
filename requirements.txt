@@ -1,7 +1,14 @@
-# Dependencias de ejecución. Las de desarrollo viven en pyproject.toml
-# (extra "dev") y no se instalan en la imagen de producción.
-fastapi>=0.115,<1.0
-uvicorn[standard]>=0.32,<1.0
-openai>=1.60,<3.0
-pydantic>=2.9,<3.0
-pydantic-settings>=2.6,<3.0
+# Dependencias de ejecución, con versión fija.
+#
+# Se fijan exactas y no por rango: un build debe ser reproducible y una
+# versión nueva no debe entrar en producción sin que alguien la revise.
+# Las de desarrollo viven en pyproject.toml (extra "dev") y no llegan a la
+# imagen ni al despliegue.
+#
+# Actualizar con intención:  pip install -U <paquete> && pip freeze | grep <paquete>
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+openai==2.54.0
+pydantic==2.13.4
+pydantic-settings==2.15.0

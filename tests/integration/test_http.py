@@ -155,15 +155,17 @@ class TestResponsesContract:
     def test_la_salida_no_incluye_llamadas_a_herramientas(self) -> None:
         """Quien integra el agente no debe tener que ejecutar nada."""
         engine = FakeEngine(
-            [tool_response("get_patents"), text_response("Tiene 3 patentes en trámite.")]
+            [tool_response("get_certifications"), text_response("Tiene 4 certificaciones.")]
         )
         client = make_client(engine)
         try:
-            body = client.post("/responses", json={"input": "¿Patentes?"}, headers=AUTH).json()
+            body = client.post(
+                "/responses", json={"input": "¿Certificaciones?"}, headers=AUTH
+            ).json()
 
             tipos = {item["type"] for item in body["output"]}
             assert tipos == {"message"}
-            assert body["output_text"] == "Tiene 3 patentes en trámite."
+            assert body["output_text"] == "Tiene 4 certificaciones."
         finally:
             client.__exit__(None, None, None)
 
@@ -214,8 +216,6 @@ class TestValidation:
         response = client.post("/responses", json={"input": enorme}, headers=AUTH)
 
         assert response.status_code == 422
-
-
 
 
 class TestErrorHandling:
@@ -371,7 +371,7 @@ class TestAgentCard:
     def test_declara_los_datos_del_agente(self, client: TestClient) -> None:
         card = client.get("/.well-known/agent-card.json").json()
 
-        assert "Oscar Alejo" in card["name"]
+        assert "Oscar" in card["name"]
         assert card["version"]
         assert card["skills"][0]["examples"]
 
@@ -387,9 +387,7 @@ class TestAgentCard:
         assert card["openResponses"]["endpoint"].endswith("/responses")
         assert card["openResponses"]["conversationState"] == "replay_transcript"
 
-    def test_las_interfaces_usan_la_forma_de_la_version_1(
-        self, client: TestClient
-    ) -> None:
+    def test_las_interfaces_usan_la_forma_de_la_version_1(self, client: TestClient) -> None:
         """En v1.0 cada entrada lleva `protocolBinding`, no `transport`.
 
         Mezclar el nombre de v0.3 dentro de la estructura de v1.0 hace que un
@@ -530,20 +528,22 @@ class TestStreaming:
 
     def test_el_ciclo_de_herramientas_funciona_en_streaming(self) -> None:
         engine = FakeEngine(
-            [tool_response("get_patents"), text_response("Tiene 3 patentes.")]
+            [tool_response("get_certifications"), text_response("Tiene 4 certificaciones.")]
         )
         client = make_client(engine)
         try:
             eventos = _eventos_sse(
                 client.post(
-                    "/responses", json={"input": "¿patentes?", "stream": True}, headers=AUTH
+                    "/responses",
+                    json={"input": "¿certificaciones?", "stream": True},
+                    headers=AUTH,
                 ).text
             )
             deltas = "".join(
                 e["delta"] for e in eventos if e["type"] == "response.output_text.delta"
             )
 
-            assert deltas == "Tiene 3 patentes."
+            assert deltas == "Tiene 4 certificaciones."
             assert eventos[-1]["type"] == "response.completed"
         finally:
             client.__exit__(None, None, None)
