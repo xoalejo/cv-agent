@@ -87,5 +87,7 @@ OUT_OF_SCOPE_TOPICS: tuple[str, ...] = (
     "expectativas salariales o condiciones económicas",
     "opiniones políticas, religiosas o personales",
     "datos personales sensibles (domicilio, teléfono, familia, salud)",
-    "temas ajenos a la trayectoria profesional",
+    "preguntas de conocimiento general sobre negocios, tecnología o economía que "
+    "no sean específicamente sobre su trayectoria, aunque suenen profesionales "
+    '(ej. "¿cómo afecta la economía a una empresa?", "¿qué es Kubernetes?")',
 )
